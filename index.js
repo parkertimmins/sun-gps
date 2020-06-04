@@ -12,19 +12,18 @@ const canvas2 = document.getElementById('canvas2');
 const ctx2 = canvas2.getContext('2d');
 
 
-const atan2 = Math.atan2,
-      asin = Math.asin,
-      atan = Math.atan,
-      sin = Math.sin,
-      cos = Math.cos,
-      PI = Math.PI;
+
+const PI = Math.PI;
 
 sensor = new AbsoluteOrientationSensor({frequency: 1, referenceFrame: 'device' })
 sensor.addEventListener('reading', e => {
-    
-   
-    const deviceOriginVector = [0, 0, -1] 
 
+    const alt_az= compute_direction_alt_az(sensor.quaternion)    
+    compute_location(alt_az)
+
+
+    /*
+    const deviceOriginVector = [0, 0, -1] 
     const quaternion = Quaternions.toInternalQuat(sensor.quaternion)
     const screenVec = Quaternions.rotate(deviceOriginVector, quaternion) 
 
@@ -34,13 +33,12 @@ sensor.addEventListener('reading', e => {
     console.log('azimuth', degree(azimuth));
     console.log('altitude', degree(altitude));
     console.log('\n')
+    */
 
 
 
 });
 sensor.start();
-
-
 
 
 
@@ -69,7 +67,7 @@ function toAltitude(vector) {
 }
 
 function degree(rad) {
-    return rad * 180 / PI
+    return rad * (180 / PI)
 }
 
 function rad(degree) {
@@ -119,21 +117,30 @@ function toJulian(date) {
     return date.valueOf() / dayMs - 0.5 + J1970; 
 }
 
-function sind(deg) {
-    return sin(rad(deg))
+function sin(deg) {
+    return Math.sin(rad(deg))
 }
 
-function cosd(deg) {
-    return cos(rad(deg))
+function cos(deg) {
+    return Math.cos(rad(deg))
+}
+function tan(deg) {
+    return Math.tan(rad(deg))
 }
 
-function asind(x) {
-    return degree(asin(x))
-}
-function atan2d(x, y) {
-    return degree(atan2(x, y))
-}
 
+function acos(x) {
+    return degree(Math.acos(x))
+}
+function asin(x) {
+    return degree(Math.asin(x))
+}
+function atan2(x, y) {
+    return degree(Math.atan2(x, y))
+}
+function atan(x) {
+    return degree(Math.atan(x))
+}
 
 // https://www.aa.quae.nl/en/reken/zonpositie.html
 // degrees, longitude is [0, 360] west
@@ -141,35 +148,25 @@ function sun_lat_long(date) {
     const JD = toJulian(date)
     
     // mean anomaly
-    const M0 = 357.5291    
-    const M1 = 0.98560028
-    const M = (M0 + M1 * (JD - J2000)) % 360  
+    const M = (357.5291 + 0.98560028 * (JD - J2000)) % 360  
 
     // equation of center
-    const C1 = 1.9148   
-    const C2 = 0.0200  
-    const C3 = 0.0003  
-    const C = C1 * sind(M) + C2 * sind(2 * M) +  C3 * sind(3 * M)
+    const C = 1.9148 * sin(M) + 0.02 * sin(2 * M) + 0.0003 * sin(3 * M)
     
     // Perihelion and the Obliquity of the Ecliptic
-
     const ecliptic_long_peri = 102.9373 // perihelion of the earth, relative to the ecliptic and vernal equinox
     const obliquity = 23.4393 // epsilon
 
-    // The Ecliptical Coordinates
-    
     // mean ecliptic longitude
     const L = M + ecliptic_long_peri
    
-    // ecliptic long of sun 
+    // ecliptic long - 180 for the earth
     const lambda = L + C + 180
     const b = 0 // ecliptic lat - divergence of sun from ecliptic is alway 0
 
     // right ascension and declination
-    const a = atan2d(sind(lambda) * cosd(obliquity), cosd(lambda)) 
-    console.log(sind(lambda))
-    console.log(sind(obliquity))
-    const d = asind(sind(lambda) * sind(obliquity))
+    const a = atan2(sin(lambda) * cos(obliquity), cos(lambda)) 
+    const d = asin(sin(lambda) * sin(obliquity))
 
     const theta0 = 280.1470 
     const theta1 = 360.9856235
@@ -189,6 +186,85 @@ function sun_lat_long(date) {
     }
 } 
 
+function compute_direction_alt_az(sensor_quaternion) {
+    const deviceOriginVector = [0, 0, -1] 
+    const quaternion = Quaternions.toInternalQuat(sensor_quaternion)
+    const directionVec = Quaternions.rotate(deviceOriginVector, quaternion) 
+    const altitude = toAltitude(directionVec)
+    const azimuth = toAzimuth(directionVec)
+    return {altitude, azimuth}
+}
+
+
+
+function compute_location(alt_az, date) {
+
+    const {altitude, azimuth} = alt_az
+
+
+    console.log(date)
+    const sun = sun_lat_long(date) // in degrees
+    
+      // estimate based on asumption that sun at infinite distance
+    const radial_dist_to_sun = PI / 2 - altitude
+    console.log('sun', {
+        latitude: sun.latitude,
+        longitude: to_reg_long(sun.longitude)    
+    })
+   // https://en.wikipedia.org/wiki/Solution_of_triangles#Two_sides_and_the_included_angle_given_
+
+
+    const c = degree(radial_dist_to_sun)
+    console.log('c - dist here to sun', c)
+
+    // diff from pole
+    const b = 90 - sun.latitude 
+    console.log('b - dist sun to pole', b)
+    const B = degree(azimuth)
+    console.log('B - azimuth', B)
+
+    // 
+    if (b > asin(sin(c) * sin(B))) {
+        const C = asin(sin(c) * sin(B) / sin(b))
+        console.log('angle at pole', C) 
+
+        const a = compute_3rd_subtended_angle(C, B, b, c)   
+        console.log('a - dist here to pole', a)
+        const loc1 =  lat_long_from(a, b, c, sun.longitude)
+        console.log('curr1 lat', loc1.latitude) 
+        console.log('curr1 lon', to_reg_long(loc1.longitude))
+
+        if (b < c) {
+            const C_ = 180 - C 
+            const a_ = compute_3rd_subtended_angle(C_, B, b, c)   
+            const curr_loc2 =  lat_long_from(a_, b, c)
+        
+            console.log('curr2', curr_loc2) 
+        }
+    } else {
+        alert('nope')
+    }
+}
+
+
+
+function lat_long_from(a, b, c, sun_long) {
+    const latitude = 90 - a 
+    const lat_diff = b - a
+    console.log('lat_diff', lat_diff)
+
+    // cos(c) = cos(a)cos(b)  where c is hypotenuse
+    // cose(c) = cose(lat_diff) * cos(long_diff)
+    const long_diff = acos(cos(c) / cos(lat_diff))
+    console.log('long_diff', long_diff)
+    const longitude = sun_long + long_diff // fix the sign here!
+    return {latitude, longitude}
+}
+
+function compute_3rd_subtended_angle(C, B, b, c) {
+    const a = 2 * atan(tan((b - c) / 2) * sin((B + C) / 2) / sin((B - C) / 2))
+    return a
+}
 
 function run() {
     if (!hasGetUserMedia()) {
@@ -342,11 +418,29 @@ function hasGetUserMedia() {
       return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 }
 
+function to_reg_long(longitude_w) {
+    return longitude_w <= 180 ? -longitude_w : 360 - longitude_w;
+}
+
 window.onload = function() {
-    const {latitude, longitude} = sun_lat_long(Date.now())
+    //const {latitude, longitude} = sun_lat_long(Date.now())
 
-    const reg_long = longitude <= 180 ? -longitude : 360 - longitude;
-    console.log(latitude + "," + reg_long)
+    //const reg_long = longitude <= 180 ? -longitude : 360 - longitude;
+    //console.log(latitude + "," + reg_long)
 
+    const austin = {
+        latitude: 30.316947, 
+        longitude: -97.740393
+    }
+
+    const alt_az = {
+        azimuth: rad(86.47),
+        altitude: rad(43.13)
+    } 
+
+    // 10:08 austin
+    const date = new Date(1591283305000);
+
+    compute_location(alt_az, date)
     //run();
 }
