@@ -13,12 +13,33 @@ const ctx2 = canvas2.getContext('2d');
 
 
 
-const PI = Math.PI;
+
+
+// https://github.com/mourner/suncalc/blob/master/suncalc.js 
+var dayMs = 1000 * 60 * 60 * 24,
+    J1970 = 2440588,
+    J2000 = 2451545;
+
+function toJulian(date) { 
+   return date.valueOf() / dayMs - 0.5 + J1970; 
+}
+
+const sin = (deg) => Math.sin(rad(deg)),
+      cos = (deg) => Math.cos(rad(deg)),
+      tan = (deg) => Math.tan(rad(deg)),
+      acos = (x) => degree(Math.acos(x)),
+      asin = (x) => degree(Math.asin(x)),
+      atan = (x) => degree(Math.atan(x)),
+      atan2 = (x, y) => degree(Math.atan2(x, y)),
+      PI = Math.PI;
+
+
+
 
 sensor = new AbsoluteOrientationSensor({frequency: 1, referenceFrame: 'device' })
 sensor.addEventListener('reading', e => {
 
-    const alt_az= compute_direction_alt_az(sensor.quaternion)    
+    const alt_az= compute_alt_az(sensor.quaternion)    
     compute_location(alt_az)
 
 
@@ -55,15 +76,16 @@ function toAzimuth(vector) {
     
     // [0, 2PI] - positive ccw from north 
     const thetaFromNorth = (theta2PiMax + PI / 2) % (2 * PI)
-    return thetaFromNorth 
+
+    return degree(thetaFromNorth)
 }
 
 function toAltitude(vector) {
     // vector comes from a quaternion ... can throw away scalar 
     const [_, x, y, z] = vector;
-    
     const vec_len_on_xy_plane = Math.sqrt(x**2 + y**2)
-    return atan(z/vec_len_on_xy_plane )
+    const altitude = atan(z / vec_len_on_xy_plane) 
+    return degree(altitude)
 }
 
 function degree(rad) {
@@ -108,42 +130,9 @@ class Quaternions {
 }
 
 
-// https://github.com/mourner/suncalc/blob/master/suncalc.js 
-var dayMs = 1000 * 60 * 60 * 24,
-    J1970 = 2440588,
-    J2000 = 2451545;
-
-function toJulian(date) { 
-    return date.valueOf() / dayMs - 0.5 + J1970; 
-}
-
-function sin(deg) {
-    return Math.sin(rad(deg))
-}
-
-function cos(deg) {
-    return Math.cos(rad(deg))
-}
-function tan(deg) {
-    return Math.tan(rad(deg))
-}
-
-
-function acos(x) {
-    return degree(Math.acos(x))
-}
-function asin(x) {
-    return degree(Math.asin(x))
-}
-function atan2(x, y) {
-    return degree(Math.atan2(x, y))
-}
-function atan(x) {
-    return degree(Math.atan(x))
-}
 
 // https://www.aa.quae.nl/en/reken/zonpositie.html
-// degrees, longitude is [0, 360] west
+// degrees, long is [0, 360] west
 function sun_lat_long(date) {
     const JD = toJulian(date)
     
@@ -157,7 +146,7 @@ function sun_lat_long(date) {
     const ecliptic_long_peri = 102.9373 // perihelion of the earth, relative to the ecliptic and vernal equinox
     const obliquity = 23.4393 // epsilon
 
-    // mean ecliptic longitude
+    // mean ecliptic long
     const L = M + ecliptic_long_peri
    
     // ecliptic long - 180 for the earth
@@ -165,62 +154,54 @@ function sun_lat_long(date) {
     const b = 0 // ecliptic lat - divergence of sun from ecliptic is alway 0
 
     // right ascension and declination
-    const a = atan2(sin(lambda) * cos(obliquity), cos(lambda)) 
-    const d = asin(sin(lambda) * sin(obliquity))
+    const ra = atan2(sin(lambda) * cos(obliquity), cos(lambda)) 
+    const dec = asin(sin(lambda) * sin(obliquity))
+    console.log('right ascension', ra)
+    console.log('declination', dec)
 
-    const theta0 = 280.1470 
-    const theta1 = 360.9856235
-    
     // since we are looking for the place at solar noon, 
     // and hour angle H = 0 = side real time - right ascension, side real time == ra 
     // theta(sidereal) = [theta0 + theta1 * (JD - J2000) - lw] mod 360
     // (A + B) mod C = (A mod C + B mod C) mod C
-   
-    // can treat mod this way? 
-    const longitude = (theta0 + theta1 * (JD - J2000) - a) % 360
-    const latitude = d
+    const long = (280.1470 + 360.9856235 * (JD - J2000) - ra) % 360
 
     return {
-        longitude, 
-        latitude
+        long, 
+        lat: dec
     }
 } 
 
-function compute_direction_alt_az(sensor_quaternion) {
+function compute_alt_az(sensor_quaternion) {
     const deviceOriginVector = [0, 0, -1] 
     const quaternion = Quaternions.toInternalQuat(sensor_quaternion)
     const directionVec = Quaternions.rotate(deviceOriginVector, quaternion) 
     const altitude = toAltitude(directionVec)
     const azimuth = toAzimuth(directionVec)
-    return {altitude, azimuth}
+    return { altitude, azimuth }
 }
-
-
 
 function compute_location(alt_az, date) {
 
-    const {altitude, azimuth} = alt_az
+    let { altitude, azimuth } = alt_az
+    altitude += altitude_refraction_correction(altitude)
+    console.log('altitude', altitude);
 
 
     console.log(date)
     const sun = sun_lat_long(date) // in degrees
-    
-      // estimate based on asumption that sun at infinite distance
-    const radial_dist_to_sun = PI / 2 - altitude
-    console.log('sun', {
-        latitude: sun.latitude,
-        longitude: to_reg_long(sun.longitude)    
-    })
-   // https://en.wikipedia.org/wiki/Solution_of_triangles#Two_sides_and_the_included_angle_given_
 
-
-    const c = degree(radial_dist_to_sun)
+    // estimate based on asumption that sun at infinite distance
+    const dist_here_to_sun = 90 - altitude
+    console.log('sun', to_reg_lat_long(sun)) 
+ 
+    // https://en.wikipedia.org/wiki/Solution_of_triangles#Two_sides_and_the_included_angle_given_
+    const c = dist_here_to_sun 
     console.log('c - dist here to sun', c)
 
     // diff from pole
-    const b = 90 - sun.latitude 
+    const b = 90 - sun.lat 
     console.log('b - dist sun to pole', b)
-    const B = degree(azimuth)
+    const B = azimuth
     console.log('B - azimuth', B)
 
     // 
@@ -230,9 +211,9 @@ function compute_location(alt_az, date) {
 
         const a = compute_3rd_subtended_angle(C, B, b, c)   
         console.log('a - dist here to pole', a)
-        const loc1 =  lat_long_from(a, b, c, sun.longitude)
-        console.log('curr1 lat', loc1.latitude) 
-        console.log('curr1 lon', to_reg_long(loc1.longitude))
+        const loc1 =  lat_long_from(a, b, c, sun.long)
+        console.log('alt long', sun.long + C)
+        console.log('curr1', to_reg_lat_long(loc1))
 
         if (b < c) {
             const C_ = 180 - C 
@@ -246,10 +227,8 @@ function compute_location(alt_az, date) {
     }
 }
 
-
-
 function lat_long_from(a, b, c, sun_long) {
-    const latitude = 90 - a 
+    const lat = 90 - a 
     const lat_diff = b - a
     console.log('lat_diff', lat_diff)
 
@@ -257,14 +236,22 @@ function lat_long_from(a, b, c, sun_long) {
     // cose(c) = cose(lat_diff) * cos(long_diff)
     const long_diff = acos(cos(c) / cos(lat_diff))
     console.log('long_diff', long_diff)
-    const longitude = sun_long + long_diff // fix the sign here!
-    return {latitude, longitude}
+    const long = sun_long + long_diff // fix the sign here!
+    return {lat, long}
 }
 
 function compute_3rd_subtended_angle(C, B, b, c) {
     const a = 2 * atan(tan((b - c) / 2) * sin((B + C) / 2) / sin((B - C) / 2))
     return a
 }
+
+// Astronomal Algorithms 16.3
+function altitude_refraction_correction(h0) {
+    const r_minutes = 1 / tan(h0 + 7.31 / (h0 + 4.4))   
+    return r_minutes / 60
+}
+
+
 
 function run() {
     if (!hasGetUserMedia()) {
@@ -413,34 +400,62 @@ function addVideoDevicesToSelect(deviceInfos) {
 	}
 }
 
-
 function hasGetUserMedia() {
       return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 }
 
-function to_reg_long(longitude_w) {
-    return longitude_w <= 180 ? -longitude_w : 360 - longitude_w;
+function to_reg_lat_long(lat_long) {
+    return {
+        lat: lat_long.lat,
+        long: to_reg_long(lat_long.long)
+    }
+}
+
+function to_reg_long(long_w) {
+    return long_w <= 180 ? -long_w : 360 - long_w;
 }
 
 window.onload = function() {
-    //const {latitude, longitude} = sun_lat_long(Date.now())
+    //const {lat, long} = sun_lat_long(Date.now())
 
-    //const reg_long = longitude <= 180 ? -longitude : 360 - longitude;
-    //console.log(latitude + "," + reg_long)
+    //const reg_long = long <= 180 ? -long : 360 - long;
+    //console.log(lat + "," + reg_long)
 
     const austin = {
-        latitude: 30.316947, 
-        longitude: -97.740393
+        lat: 30.316947, 
+        long: -97.740393
     }
 
-    const alt_az = {
-        azimuth: rad(86.47),
-        altitude: rad(43.13)
-    } 
-
     // 10:08 austin
-    const date = new Date(1591283305000);
+    const test1 = {
+        alt_az: {
+            azimuth: 87.37,
+            altitude: 44.71
+        },
+        date: new Date(1591283305000)
+    }
 
-    compute_location(alt_az, date)
+    // 11 austin
+    const test2 = {
+        alt_az: {
+            azimuth: 94.06,
+            altitude: 55.83 
+        },
+        date: new Date(1591286400000)
+    }
+
+
+    // 10:31 austin
+    const test3 = {
+        alt_az: {
+            azimuth: 90.1,
+            altitude: 49.58 
+        },
+        date: new Date(1591284660000)
+    }
+
+
+    const t = test1
+    compute_location(t.alt_az, t.date)
     //run();
 }
