@@ -2,15 +2,42 @@ goog.require('goog.structs.Heap');
 
 
 
+const state = {
+	alt_az: null
+}
+
 
 const video = document.querySelector('video');
 const videoSelect = document.querySelector('select#videoSource');
 
 const canvas1 = document.getElementById('canvas1');
 const ctx1 = canvas1.getContext('2d');
-const canvas2 = document.getElementById('canvas2');
-const ctx2 = canvas2.getContext('2d');
 
+let map = null;
+
+//const canvas2 = document.getElementById('canvas2');
+//const ctx2 = canvas2.getContext('2d');
+
+
+function fetchJSON(url) {
+  return fetch(url)
+    .then(function(response) {
+      return response.json();
+    });
+}
+
+function loadBaseMap() {
+	fetchJSON('natural-earth-data/ne_50m_admin_0_sovereignty.geojson')
+		.then((data) => L.geoJSON(data, {color: 'green'}).addTo(map))
+	
+	fetchJSON('natural-earth-data/ne_50m_admin_1_states_provinces_lines.geojson')
+		.then((data) => L.geoJSON(data, {color: 'green'}).addTo(map))
+
+	fetchJSON('natural-earth-data/ne_50m_populated_places_simple.geojson')
+		.then((data) => L.geoJSON(data, { 
+			pointToLayer: (geoJsonPoint, latlng) => L.circle(latlng, {radius: 10000, color: 'green'})
+		}).addTo(map))
+}
 
 
 
@@ -34,30 +61,10 @@ const sin = (deg) => Math.sin(rad(deg)),
       PI = Math.PI;
 
 
-
-
-sensor = new AbsoluteOrientationSensor({frequency: 1, referenceFrame: 'device' })
+// constantly update altitude and azimuth in global state
+sensor = new AbsoluteOrientationSensor({frequency: 60, referenceFrame: 'device' })
 sensor.addEventListener('reading', e => {
-
-    const alt_az= compute_alt_az(sensor.quaternion)    
-    compute_location(alt_az)
-
-
-    /*
-    const deviceOriginVector = [0, 0, -1] 
-    const quaternion = Quaternions.toInternalQuat(sensor.quaternion)
-    const screenVec = Quaternions.rotate(deviceOriginVector, quaternion) 
-
-    const altitude = toAltitude(screenVec)
-    const azimuth = toAzimuth(screenVec)
-
-    console.log('azimuth', degree(azimuth));
-    console.log('altitude', degree(altitude));
-    console.log('\n')
-    */
-
-
-
+	state.alt_az = compute_alt_az(sensor.quaternion)    
 });
 sensor.start();
 
@@ -85,7 +92,7 @@ function toAltitude(vector) {
     const [_, x, y, z] = vector;
     const vec_len_on_xy_plane = Math.sqrt(x**2 + y**2)
     const altitude = atan(z / vec_len_on_xy_plane) 
-    return degree(altitude)
+    return altitude
 }
 
 function degree(rad) {
@@ -129,13 +136,72 @@ class Quaternions {
     }
 }
 
+function toDays(date)   { return toJulian(date) - J2000; }
 
+
+function moonCoords(date) { // geocentric ecliptic coordinates of the moon
+	var rad  = PI / 180;
+	var d = toDays(date)	
+
+    var L = rad * (218.316 + 13.176396 * d), // ecliptic longitude
+        M = rad * (134.963 + 13.064993 * d), // mean anomaly
+        F = rad * (93.272 + 13.229350 * d),  // mean distance
+
+        l  = L + rad * 6.289 * Math.sin(M), // longitude
+        b  = rad * 5.128 * Math.sin(F),     // latitude
+        dt = 385001 - 20905 * Math.cos(M);  // distance to the moon in km
+
+    return {
+        ra: right_ascension(l, b),
+        dec: declination(l, b),
+        dist: dt
+    };
+}
+
+function r() {
+    const ll = []
+    for (let d = 1; d < 30; d++ ) {
+        const date = Date.parse(d + ' Jan 2000 12:00:00 GMT')
+            const jd = toJulian(date)
+        const m = Moon.eclip_lat_long(jd)
+        const ra = right_ascension(m)
+        const dec = declination(m)
+        const lat = dec
+        const long = to_reg_long(ra_to_long(jd, ra))
+
+        console.log(lat + ", " + long + ", " + new Date(date).toDateString())
+    }
+    return ll;
+}
+
+const obliquity = 23.4393 // epsilon
+function right_ascension(eclip) {
+    const l = cos(eclip.lat) * cos(eclip.long)
+    const m = 0.9175 * cos(eclip.lat) * sin(eclip.long) - 0.3978 * sin(eclip.lat)    
+    const new_res = atan(m/l) 
+
+    return atan2(sin(eclip.long) * cos(obliquity) - tan(eclip.lat) * sin(obliquity), cos(eclip.long))
+    //const old = mod(atan2(sin(eclip.long) * cos(obliquity) - tan(eclip.lat) * sin(obliquity), cos(eclip.long)), 360)
+    
+    //console.log('ra', new_res, old)
+    return new_res
+}
+function declination(eclip) {
+    return asin(sin(eclip.lat) * cos(obliquity) + cos(eclip.lat) * sin(obliquity) * sin(eclip.long))
+}
+
+// since we are looking for the place at solar noon, 
+// and hour angle H = 0 = side real time - right ascension, side real time == ra 
+// theta(sidereal) = [theta0 + theta1 * (JD - J2000) - lw] mod 360
+// (A + B) mod C = (A mod C + B mod C) mod C
+function ra_to_long(JD, ra) {
+    return (280.1470 + 360.9856235 * (JD - J2000) - ra) % 360
+}
+
+// degrees, long is [0, 360] west
 
 // https://www.aa.quae.nl/en/reken/zonpositie.html
-// degrees, long is [0, 360] west
-function sun_lat_long(date) {
-    const JD = toJulian(date)
-    
+function sun_eclip_lat_long(JD) {
     // mean anomaly
     const M = (357.5291 + 0.98560028 * (JD - J2000)) % 360  
 
@@ -154,20 +220,9 @@ function sun_lat_long(date) {
     const b = 0 // ecliptic lat - divergence of sun from ecliptic is alway 0
 
     // right ascension and declination
-    const ra = atan2(sin(lambda) * cos(obliquity), cos(lambda)) 
-    const dec = asin(sin(lambda) * sin(obliquity))
-    console.log('right ascension', ra)
-    console.log('declination', dec)
-
-    // since we are looking for the place at solar noon, 
-    // and hour angle H = 0 = side real time - right ascension, side real time == ra 
-    // theta(sidereal) = [theta0 + theta1 * (JD - J2000) - lw] mod 360
-    // (A + B) mod C = (A mod C + B mod C) mod C
-    const long = (280.1470 + 360.9856235 * (JD - J2000) - ra) % 360
-
     return {
-        long, 
-        lat: dec
+        long: lambda,
+        lat: b
     }
 } 
 
@@ -180,66 +235,92 @@ function compute_alt_az(sensor_quaternion) {
     return { altitude, azimuth }
 }
 
-function compute_location(alt_az, date) {
 
-    let { altitude, azimuth } = alt_az
-    altitude += altitude_refraction_correction(altitude)
-    console.log('altitude', altitude);
+const earth_to_sun_km = 149600000.0 // ? needed?
+const earth_radius_km = 6378.14 
 
-
-    console.log(date)
-    const sun = sun_lat_long(date) // in degrees
-
+function sun_compute_location(alt_az, date) {
+    const jd = toJulian(date)
+    const sun_loc = sun_eclip_lat_long(jd)
     // estimate based on asumption that sun at infinite distance
-    const dist_here_to_sun = 90 - altitude
-    console.log('sun', to_reg_lat_long(sun)) 
+    const parallax_angle = 0
+    return compute_location(alt_az, jd, sun_loc, parallax_angle)
+}
+
+function moon_compute_location(alt_az, date) {
+    const jd = toJulian(date)
+    const moon_loc = Moon.eclip_lat_long(jd)
+    const parallax_angle = Moon.horizontal_parallax_jd(jd) 
+    return compute_location(alt_az, jd, moon_loc, parallax_angle)
+}
+
+function compute_location(alt_az, jd, eclip_lat_long, parallax_angle) {
+    
+	let { altitude, azimuth } = alt_az
+    const alt_correction = altitude_refraction_correction(altitude)
+    altitude += alt_correction
+   
+    const ra = right_ascension(eclip_lat_long)
+    const dec = declination(eclip_lat_long)
+
+    console.log(ra, dec)
+    // nearest point to celestial object
+    const p = {
+        long: ra_to_long(jd, ra),
+        lat: dec
+    }
+    console.log(to_reg_lat_long(p))
+
+
+    const here_to_p = 90 - altitude - parallax_angle
  
     // https://en.wikipedia.org/wiki/Solution_of_triangles#Two_sides_and_the_included_angle_given_
-    const c = dist_here_to_sun 
-    console.log('c - dist here to sun', c)
+    const pole_to_p = 90 - p.lat 
 
-    // diff from pole
-    const b = 90 - sun.lat 
-    console.log('b - dist sun to pole', b)
-    const B = azimuth
-    console.log('B - azimuth', B)
+    if (pole_to_p > asin(sin(here_to_p) * sin(azimuth))) {
+        const pole_angle = asin(sin(here_to_p) * sin(azimuth) / sin(pole_to_p))
+        const pole_to_here = compute_3rd_subtended_angle(pole_angle, azimuth, pole_to_p, here_to_p)   
 
-    // 
-    if (b > asin(sin(c) * sin(B))) {
-        const C = asin(sin(c) * sin(B) / sin(b))
-        console.log('angle at pole', C) 
+        const here = {
+            lat: 90 - pole_to_here,
+            long: mod((p.long + pole_angle), 360)
+        }
 
-        const a = compute_3rd_subtended_angle(C, B, b, c)   
-        console.log('a - dist here to pole', a)
-        const loc1 =  lat_long_from(a, b, c, sun.long)
-        console.log('alt long', sun.long + C)
-        console.log('curr1', to_reg_lat_long(loc1))
-
+    /*    
+	    console.log('alt_correction', alt_correction);
+		console.log(date)
+		console.log('altitude', altitude);
+		console.log('B - azimuth', azimuth)
+     	console.log('sun', sun) 
+    	console.log('c - dist here to sun', here_to_sun)
+		console.log('b - sun to pole', pole_to_sun)
+        console.log('angle at pole', pole_angle) 
+        console.log('a - here to pole', pole_to_here)
+        console.log('here', here) 
+        console.log('curr1', to_reg_lat_long(here))
+    */
+		return here
+        /*
         if (b < c) {
             const C_ = 180 - C 
+            const pole_to_here = compute_3rd_subtended_angle(pole_angle, azimuth, pole_to_sun, here_to_sun)   
             const a_ = compute_3rd_subtended_angle(C_, B, b, c)   
             const curr_loc2 =  lat_long_from(a_, b, c)
         
             console.log('curr2', curr_loc2) 
         }
+        */
     } else {
-        alert('nope')
+		alert('Could not find a solution for you location. Perhaps you are not on earth?')
     }
 }
 
-function lat_long_from(a, b, c, sun_long) {
-    const lat = 90 - a 
-    const lat_diff = b - a
-    console.log('lat_diff', lat_diff)
+function mod(m, n) {
+	return ((m%n)+n)%n;
+};
 
-    // cos(c) = cos(a)cos(b)  where c is hypotenuse
-    // cose(c) = cose(lat_diff) * cos(long_diff)
-    const long_diff = acos(cos(c) / cos(lat_diff))
-    console.log('long_diff', long_diff)
-    const long = sun_long + long_diff // fix the sign here!
-    return {lat, long}
-}
 
+// take two angles and two subtended arc-angles
 function compute_3rd_subtended_angle(C, B, b, c) {
     const a = 2 * atan(tan((b - c) / 2) * sin((B + C) / 2) / sin((B - C) / 2))
     return a
@@ -253,7 +334,113 @@ function altitude_refraction_correction(h0) {
 
 
 
-function run() {
+// An Alternative Lunar Ephemeris Model
+// https://caps.gsfc.nasa.gov/simpson/pubs/slunar.pdf
+class Moon {
+    static eclip_lat_long(jd) {
+        const t = Moon.julian_centuries(jd)
+        const eclip_long_base = Moon.ecliptic_long_base(t)
+        const eclip_lat_base = Moon.ecliptic_lat_base(t)
+        //const [eclip_lat, eclip_long] = Moon.precession_correction(t, eclip_lat_base, eclip_long_base)
+        return {
+            long: eclip_long_base,
+            lat: eclip_lat_base
+        }
+    }
+
+    static horizontal_parallax_jd(jd) {
+        const t = Moon.julian_centuries(jd)
+        return Moon.horizontal_parallax(t)
+    }
+
+    static distance(jd) {
+        const t = Moon.julian_centuries(jd)
+        const earth_radius_km = 6378.14 
+        const theta = Moon.horizontal_parallax(t)
+        return earth_radius_km / sin(theta)
+    }
+
+    // t in julian centuries
+    static ecliptic_long_base(t) {
+        const new_res = 218.32 + 418267.881 * t + 
+             6.29 * sin( 477198.87 * t + 135.0) +
+            -1.27 * sin(-413335.36 * t + 259.3) + 
+             0.66 * sin( 890534.22 * t + 235.7) +
+             0.21 * sin( 954397.74 * t + 269.9) +
+            -0.19 * sin(  35999.05 * t + 357.5) +
+            -0.11 * sin( 966404.03 * t + 186.6)
+
+        const sin_constants = [
+            [6.29,  477198.87,  135.0],
+            [-1.27, -413335.36, 259.3],
+            [0.66,  890534.22,  235.7],
+            [0.21,  954397.74,  269.9], 
+            [-0.19, 35999.05,   357.5],
+            [-0.11, 966404.03,  186.6],
+        ]
+
+        const old = 218.32 + 418267.881 * t + 
+            sum(sin_constants.map(([a, b, c]) => a * sin(b * t + c)))
+
+        //console.log('eclip lat', new_res, old)
+        return new_res
+
+    }
+
+    static ecliptic_lat_base(t) {
+        const sin_constants = [
+            [5.13,  483202.02,  93.3],
+            [0.28,  960400.89,  228.2],
+            [-0.28, 6003.15,    318.3],
+            [-0.17, -407332.21, 217.6]
+        ]
+        return sum(sin_constants.map(([a, b, c]) => a * sin(b * t + c)))
+        //return sin_constants.map(([a, b, c]) => a + "sin(" + b + "t + " + c + ")")
+       
+    }
+
+    static horizontal_parallax(t) {
+        const cos_constants = [
+            [0.0518,    477198.85,  134.9],
+            [0.0095,    -413335.38, 259.2],
+            [0.0078,    890534.23,  235.7],
+            [0.0028,    954397.7,   269.9]       
+        ] 
+
+        return 0.9508 + sum(cos_constants.map(([a, b, c]) => a * cos(b * t + c)))
+    }
+
+    static precession_correction(t, lat, long) {
+        const a = 1.396971 * t + 0.0003086 * t * t
+        const b = 0.013056 * t - 0.0000092 * t * t
+        const c = 5.12362 - 1.155358 * t - 0.0001964 * t * t
+
+        const lat_pre = lat - b * sin(long + c)
+        const long_pre = long - a + b * cos(long + c) * tan(lat_pre)
+        return [lat_pre, long_pre]
+    }
+
+    static julian_centuries(jd) {
+        const days_in_century = 36525.0
+        return (jd - 2451545) / days_in_century
+    }
+
+}
+
+
+function sum(arr) {
+    let total = 0
+    for (let a of arr) {
+        total += a
+    }
+    return total
+}
+
+
+
+
+
+function initVideo() {
     if (!hasGetUserMedia()) {
         alert('getUserMedia() is not supported by your browser');
         return;
@@ -271,19 +458,41 @@ function run() {
 function setSelectedStream() {
 	setVideoToSelectedStream()
 	setCanvasToSelectStream();
-		//.then(setCanvasToSelectStream);
 }
 
-
 function timerCallback() {
-	//if (video.paused || video.ended) {
-	 // return;
-//	}
-	computeFrame();
+	copyVideoToCanvas();
 	setTimeout(timerCallback, 10);
 }
 
-function computeFrame() {
+function copyVideoToCanvas() {
+	
+	// should probably not do every frame ¯\_(ツ)_/¯
+	setCanvasDimensions();
+
+	if (canvas1.width === 0 || canvas1.height === 0) {
+		return;
+	}
+
+	const canvas = canvas1
+	const ctx = canvas.getContext("2d");
+	
+	// first copy frame from video element to canvas
+	ctx.drawImage(video, 0, 0);
+
+	ctx.strokeStyle = "#FF0000";
+	ctx.lineWidth = 3 
+	ctx.beginPath();
+	ctx.moveTo(0, canvas.height / 2);
+	ctx.lineTo(canvas.width, canvas.height / 2);
+	
+	ctx.moveTo(canvas.width / 2, 0);
+	ctx.lineTo(canvas.width / 2, canvas.height);
+	ctx.stroke();	
+}
+
+
+function copyVideoFrameWithChanges() {
 	
 	// should probably not do every frame ¯\_(ツ)_/¯
 	setCanvasDimensions();
@@ -351,11 +560,12 @@ function avg(nums) {
 	return sum / parseFloat(nums.length)
 }
 
+// sets logically pixel width of canvas, not size of html element, hence works with width: 100% 
 function setCanvasDimensions() {
 	canvas1.width = video.videoWidth
 	canvas1.height = video.videoHeight
-	canvas2.width = video.videoWidth
-	canvas2.height = video.videoHeight
+	//canvas2.width = video.videoWidth
+	//canvas2.height = video.videoHeight
 }
 
 function setCanvasToSelectStream() {
@@ -412,50 +622,135 @@ function to_reg_lat_long(lat_long) {
 }
 
 function to_reg_long(long_w) {
+    long_w = mod(long_w, 360)
     return long_w <= 180 ? -long_w : 360 - long_w;
 }
 
+
 window.onload = function() {
-    //const {lat, long} = sun_lat_long(Date.now())
+    
+    /*
+	map = L.map('map', {
+		center: [24.944292, 0.202651],
+		zoom: 2
+	})
+    
+	loadBaseMap();
+	initVideo();
 
-    //const reg_long = long <= 180 ? -long : 360 - long;
-    //console.log(lat + "," + reg_long)
+	document.getElementById("find-location").onclick = () => {
+		const { lat, long } = compute_location(state.alt_az, Date.now())
+		const lat_long = [lat, to_reg_long(long)].map(n => n.toFixed(4))
+			
+		//const marker = L.marker([lat, long_reg]).addTo(map);	
+		const popup = L.popup()
+			.setLatLng(lat_long)
+			.setContent(JSON.stringify(lat_long))
+			.openOn(map);
 
-    const austin = {
-        lat: 30.316947, 
-        long: -97.740393
+		map.setView(lat_long, 5)
+	}
+
+	document.getElementById("show-camera").onclick = () => {
+		document.getElementById("camera-pane").style.display = 'block'
+		document.getElementById("map-pane").style.display = 'none'
+	}
+
+	document.getElementById("show-map").onclick = () => {
+		document.getElementById("camera-pane").style.display = 'none'
+		document.getElementById("map-pane").style.display = 'block'
+		map.invalidateSize()
+	}
+    */
+    
+    for (let t of tests) {
+        run_test(t)
     }
+}
 
+
+function run_test(t) {
+	const {lat, long}  = sun_compute_location(t.alt_az, t.date)
+	const lat_err = Math.abs(lat - t.here.lat)
+	const long_err = Math.abs(to_reg_long(long) - t.here.long)
+	//console.log('lat_err', lat_err)
+	//console.log('long_err', long_err)
+	if (lat_err > 1 || long_err > 1) {
+		console.log(t)
+	}
+}
+
+
+
+const tests = [
     // 10:08 austin
-    const test1 = {
+    {
+		here: { lat: 30.316947, long: -97.740393 },
         alt_az: {
             azimuth: 87.37,
             altitude: 44.71
         },
         date: new Date(1591283305000)
-    }
+    },
 
     // 11 austin
-    const test2 = {
+    {
+		here: { lat: 30.316947, long: -97.740393 },
         alt_az: {
             azimuth: 94.06,
             altitude: 55.83 
         },
         date: new Date(1591286400000)
-    }
+    },
 
 
     // 10:31 austin
-    const test3 = {
+    {
+		here: { lat: 30.316947, long: -97.740393 },
         alt_az: {
             azimuth: 90.1,
             altitude: 49.58 
         },
         date: new Date(1591284660000)
+    },
+
+    // 4:00pm austin - sun to east
+   	{ 
+		here: { lat: 30.316947, long: -97.740393 },
+        alt_az: {
+            azimuth: 266.14,
+            altitude: 55.59
+        },
+        date: new Date(1591304400000)
+    },
+
+    // lat: 15.876809
+    // long: -23.99414 -cape verde
+    // here west of utc, sun east of utc
+    {
+        here: {
+            lat: 15.876809,
+            long: -23.99414
+        },
+        alt_az: {
+            azimuth: 73.5 ,
+            altitude: 53.06 
+        },
+        date: new Date("2020-06-04T10:00:00.000-01:00")
+    },
+
+    // tunis 
+    // here east of utc, sun west
+    {
+        here: {
+            lat: 36.738884, 
+            long: 10.1074218 
+        },
+        alt_az: {
+            azimuth: 269.55,
+            altitude: 40.45 
+        },
+        date: new Date("2020-06-04T16:00:00.000+01:00")
     }
+]
 
-
-    const t = test1
-    compute_location(t.alt_az, t.date)
-    //run();
-}

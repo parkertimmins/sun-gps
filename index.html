@@ -1,15 +1,30 @@
 <html>
     <head>
+        <link rel="stylesheet" href="leaflet/leaflet.css" />
+        <script src="leaflet/leaflet.js"></script>
+
+
+
         <link rel="stylesheet" type="text/css" href="index.css">
         <script src="closure-library/closure/goog/base.js"></script>
     </head>
     <body>
-        <select id="videoSource"></select>
-        <video autoplay hidden></video>
+        <button id="show-camera">Camera</button>
+        <button id="show-map">Map</button>
+        
+        <div id="map-pane"> 
+            <div id="map"></div> 
+        </div>
 
-        <canvas id="canvas1" hidden></canvas>
-        <canvas id="canvas2"></canvas>
-            
+        <div id="camera-pane"> 
+            <video autoplay hidden></video>
+            <canvas id="canvas1"></canvas>
+            <!--<canvas id="canvas2"></canvas>-->
+                
+            <select id="videoSource"></select>
+            <button id="find-location">Find Location</button>
+        </div>
+
 
         <script src="index.js"></script>
     </body>
