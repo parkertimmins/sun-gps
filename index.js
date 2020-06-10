@@ -137,12 +137,14 @@ class Quaternions {
 }
 
 function toDays(date)   { return toJulian(date) - J2000; }
+var e = (PI / 180) * 23.4397; // obliquity of the Earth
+function rightAscension(l, b) { return Math.atan(Math.sin(l) * Math.cos(e) - Math.tan(b) * Math.sin(e), Math.cos(l)); }
+function declin(l, b)    { return Math.asin(sin(b) * Math.cos(e) + Math.cos(b) * Math.sin(e) * Math.sin(l)); }
 
+function moonCoords(d) { // geocentric ecliptic coordinates of the moon
 
-function moonCoords(date) { // geocentric ecliptic coordinates of the moon
-	var rad  = PI / 180;
-	var d = toDays(date)	
-
+	var d = toDays(d)
+	var rad = PI / 180;
     var L = rad * (218.316 + 13.176396 * d), // ecliptic longitude
         M = rad * (134.963 + 13.064993 * d), // mean anomaly
         F = rad * (93.272 + 13.229350 * d),  // mean distance
@@ -152,11 +154,12 @@ function moonCoords(date) { // geocentric ecliptic coordinates of the moon
         dt = 385001 - 20905 * Math.cos(M);  // distance to the moon in km
 
     return {
-        ra: right_ascension(l, b),
-        dec: declination(l, b),
-        dist: dt
+        ra: rightAscension(l, b) * 180 / PI,
+        dec: declin(l, b) * 180 / PI 
     };
 }
+
+
 
 function r() {
     const ll = []
@@ -362,29 +365,13 @@ class Moon {
 
     // t in julian centuries
     static ecliptic_long_base(t) {
-        const new_res = 218.32 + 418267.881 * t + 
+        return 218.32 + 481267.881 * t + 
              6.29 * sin( 477198.87 * t + 135.0) +
             -1.27 * sin(-413335.36 * t + 259.3) + 
              0.66 * sin( 890534.22 * t + 235.7) +
              0.21 * sin( 954397.74 * t + 269.9) +
             -0.19 * sin(  35999.05 * t + 357.5) +
             -0.11 * sin( 966404.03 * t + 186.6)
-
-        const sin_constants = [
-            [6.29,  477198.87,  135.0],
-            [-1.27, -413335.36, 259.3],
-            [0.66,  890534.22,  235.7],
-            [0.21,  954397.74,  269.9], 
-            [-0.19, 35999.05,   357.5],
-            [-0.11, 966404.03,  186.6],
-        ]
-
-        const old = 218.32 + 418267.881 * t + 
-            sum(sin_constants.map(([a, b, c]) => a * sin(b * t + c)))
-
-        //console.log('eclip lat', new_res, old)
-        return new_res
-
     }
 
     static ecliptic_lat_base(t) {
