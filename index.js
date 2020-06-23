@@ -1,5 +1,3 @@
-//goog.require('goog.structs.Heap');
-
 
 
 const state = {
@@ -428,6 +426,7 @@ function sum(arr) {
 
 
 function initVideo() {
+    console.log('here:');
     if (!hasGetUserMedia()) {
         alert('getUserMedia() is not supported by your browser');
         return;
@@ -568,7 +567,7 @@ function setVideoToSelectedStream() {
   	}
 
 	const constraints = {
-		video: { deviceId: { exact: videoSelect.value } }
+		video: { deviceId: videoSelect.value  }
   	};
 
   	return navigator.mediaDevices
@@ -616,7 +615,6 @@ function to_reg_long(long_w) {
 
 window.onload = function() {
     
-    /*
 	map = L.map('map', {
 		center: [24.944292, 0.202651],
 		zoom: 2
@@ -626,7 +624,7 @@ window.onload = function() {
 	initVideo();
 
 	document.getElementById("find-location").onclick = () => {
-		const { lat, long } = compute_location(state.alt_az, Date.now())
+		const { lat, long } = moon_compute_location(state.alt_az, Date.now())
 		const lat_long = [lat, to_reg_long(long)].map(n => n.toFixed(4))
 			
 		//const marker = L.marker([lat, long_reg]).addTo(map);	
@@ -648,13 +646,15 @@ window.onload = function() {
 		document.getElementById("map-pane").style.display = 'block'
 		map.invalidateSize()
 	}
-    */
     
+    
+}
+
+function run_tests() {
     for (let t of tests) {
         run_test(t)
     }
 }
-
 
 function run_test(t) {
 	const {lat, long}  = sun_compute_location(t.alt_az, t.date)
