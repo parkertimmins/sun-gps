@@ -511,11 +511,17 @@ function initVideo() {
         return;
     }
 
-	navigator.mediaDevices.enumerateDevices()
-		.then(addVideoDevicesToSelect)
-		.then(setSelectedStream)
-		.catch(handleError);
-
+    // iphone request ask permission before enumerating devices
+	navigator.mediaDevices
+        .getUserMedia({ video: true })
+        .then(() => {
+	        navigator.mediaDevices
+                .enumerateDevices()
+                .then(addVideoDevicesToSelect)
+                .then(setSelectedStream)
+                .catch(handleError);
+        })
+        
 	videoSelect.onchange = setSelectedStream;
 	
 }
