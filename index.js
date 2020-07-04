@@ -101,15 +101,11 @@ function iOSGetOrientationPerms() {
         .then(permissionState => {
           if (permissionState === 'granted') {
             window.addEventListener('deviceorientation', () => {
-                console.log(event);
-                  var absolute = event.absolute;
-                  var alpha    = event.alpha;
-                  var beta     = event.beta;
-                  var gamma    = event.gamma 
-                console.log("absolute", absolute);
-                console.log("alpha", alpha);
-                console.log("beta", beta);
-                console.log("gamma", gamma);
+                console.log("absolute", event.absolute);
+                console.log("alpha", event.alpha);
+                console.log("beta", event.beta);
+                console.log("gamma", event.gamma);
+                console.log("webkitCompassHeading", event.webkitCompassHeading);
             });
           }
         })
