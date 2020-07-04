@@ -1,5 +1,26 @@
 
 
+const con = window.console;
+const console = {
+    log: function() {
+        con.log(...arguments);
+        log_in_html('LOG', [...arguments]);
+    },
+    warn: function() {
+        con.warn(...arguments);
+        log_in_html('WARN', [...arguments]);
+    },
+    error: function() {
+        con.error(...arguments);
+        log_in_html('ERROR', [...arguments]);
+    }
+};
+window.console = console;
+window.onerror = function (msg, url, line) {
+    log_in_html("ONERROR", [msg, url, line]);
+}
+
+
 const state = {
 	alt_az: null
 }
@@ -40,19 +61,16 @@ function loadBaseMap() {
 }
 
 
-const html_logs = true;
-function log() {
-    const args = [].slice.call(arguments);
-    const msg = args.map(a => a.toString()).join(" ")
-    console.log(...args);
-    if (html_logs) {
-        log_in_html(msg);
-    }
-}
 
-function log_in_html(msg) {
+
+const html_logs = true;
+function log_in_html(level, args) {
+    if (!html_logs) {
+        return;
+    }
+    const msg = args.map(a => JSON.stringify(a)).join("\t")
     const log = document.createElement('p');
-    log.textContent = new Date(Date.now()).toLocaleString() + ":\t" + msg;
+    log.textContent = level + " " + new Date(Date.now()).toLocaleString() + ":\t" + msg;
     document.getElementById('logs')
         .appendChild(log);
 }
@@ -188,7 +206,7 @@ function r() {
         const lat = dec
         const long = to_reg_long(ra_to_long(jd, ra))
 
-        log(lat + ", " + long + ", " + new Date(date).toDateString())
+        console.log(lat + ", " + long + ", " + new Date(date).toDateString())
     }
     return ll;
 }
@@ -202,7 +220,7 @@ function right_ascension(eclip) {
     return atan2(sin(eclip.long) * cos(obliquity) - tan(eclip.lat) * sin(obliquity), cos(eclip.long))
     //const old = mod(atan2(sin(eclip.long) * cos(obliquity) - tan(eclip.lat) * sin(obliquity), cos(eclip.long)), 360)
     
-    //log('ra', new_res, old)
+    //console.log('ra', new_res, old)
     return new_res
 }
 function declination(eclip) {
@@ -295,13 +313,13 @@ function compute_location(alt_az, jd, eclip_lat_long, parallax_angle) {
     const ra = right_ascension(eclip_lat_long)
     const dec = declination(eclip_lat_long)
 
-    log(ra, dec)
+    console.log(ra, dec)
     // nearest point to celestial object
     const p = {
         long: ra_to_long(jd, ra),
         lat: dec
     }
-    log(to_reg_lat_long(p))
+    console.log(to_reg_lat_long(p))
 
 
     const here_to_p = 90 - altitude - parallax_angle
@@ -318,17 +336,17 @@ function compute_location(alt_az, jd, eclip_lat_long, parallax_angle) {
             long: mod((p.long + pole_angle), 360)
         }
 
-        log('alt_az', alt_az);
-        log('p', p);
-	    log('alt_correction', alt_correction);
-		log('altitude', altitude);
-		log('B - azimuth', azimuth)
-    	log('c - dist here to p', here_to_p)
-		log('b - pole_to_p', pole_to_p)
-        log('angle at pole', pole_angle) 
-        log('a - here to pole', pole_to_here)
-        log('here', here) 
-        log('curr1', to_reg_lat_long(here))
+        console.log('alt_az', alt_az);
+        console.log('p', p);
+	    console.log('alt_correction', alt_correction);
+		console.log('altitude', altitude);
+		console.log('B - azimuth', azimuth)
+    	console.log('c - dist here to p', here_to_p)
+		console.log('b - pole_to_p', pole_to_p)
+        console.log('angle at pole', pole_angle) 
+        console.log('a - here to pole', pole_to_here)
+        console.log('here', here) 
+        console.log('curr1', to_reg_lat_long(here))
 		
         return here
         /*
@@ -338,7 +356,7 @@ function compute_location(alt_az, jd, eclip_lat_long, parallax_angle) {
             const a_ = compute_3rd_subtended_angle(C_, B, b, c)   
             const curr_loc2 =  lat_long_from(a_, b, c)
         
-            log('curr2', curr_loc2) 
+            console.log('curr2', curr_loc2) 
         }
         */
     } else {
@@ -544,7 +562,7 @@ function copyVideoFrameWithChanges() {
 	    .map(pixel => pixelToRc(pixel, canvas1.width))
 	const rCenter = Math.round(avg(rcPairs.map(rc => rc[0])))
 	const cCenter = Math.round(avg(rcPairs.map(rc => rc[1])))
-    log(rCenter, cCenter)
+    console.log(rCenter, cCenter)
     
     const square = 10	
 	for (let r = rCenter - square; r < rCenter + square; r++) {
@@ -584,7 +602,7 @@ function setCanvasDimensions() {
 }
 
 function setCanvasToSelectStream() {
-	log('calling setCanvasToSelectStream')
+	console.log('calling setCanvasToSelectStream')
 	timerCallback();
 }
 
@@ -609,7 +627,7 @@ function setVideoToSelectedStream() {
 
 
 function handleError(error) {
-  error('Error: ', error);
+    console.error('Error: ', error);
 }
 
 function addVideoDevicesToSelect(deviceInfos) {
@@ -689,10 +707,10 @@ function run_test(t) {
 	const {lat, long}  = sun_compute_location(t.alt_az, t.date)
 	const lat_err = Math.abs(lat - t.here.lat)
 	const long_err = Math.abs(to_reg_long(long) - t.here.long)
-	//log('lat_err', lat_err)
-	//log('long_err', long_err)
+	//console.log('lat_err', lat_err)
+	//console.log('long_err', long_err)
 	if (lat_err > 1 || long_err > 1) {
-		log(t)
+		console.log(t)
 	}
 }
 
