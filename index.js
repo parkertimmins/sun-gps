@@ -63,7 +63,7 @@ function loadBaseMap() {
 
 
 
-const html_logs = true;
+const html_logs = false;
 function log_in_html(level, args) {
     if (!html_logs) {
         return;
@@ -101,7 +101,6 @@ function iOSGetOrientationPerms() {
         .then(permissionState => {
           if (permissionState === 'granted') {
             window.addEventListener('deviceorientation', () => {
-                console.log("absolute", event.absolute);
                 console.log("alpha", event.alpha);
                 console.log("beta", event.beta);
                 console.log("gamma", event.gamma);
