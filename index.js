@@ -94,29 +94,52 @@ const sin = (deg) => Math.sin(rad(deg)),
       atan2 = (x, y) => degree(Math.atan2(x, y)),
       PI = Math.PI;
 
-
-console.log('window.AbsoluteOrientationSensor', typeof window.AbsoluteOrientationSensor !== 'undefined')
-console.log('AbsoluteOrientationSensor', typeof AbsoluteOrientationSensor !== 'undefined')
-
-
-let sensor = null;
-Promise.all([navigator.permissions.query({ name: "accelerometer" }),
-             navigator.permissions.query({ name: "magnetometer" }),
-             navigator.permissions.query({ name: "gyroscope" })])
-       .then(results => {
-         if (results.every(result => result.state === "granted")) {
-            sensor = new window.AbsoluteOrientationSensor({frequency: 60, referenceFrame: 'device' })
-            sensor.start();
-            
-            // constantly update altitude and azimuth in global state
-            sensor.addEventListener('reading', e => {
-                state.alt_az = compute_alt_az(sensor.quaternion)    
+function iOSGetOrientationPerms() {
+    // feature detect
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission()
+        .then(permissionState => {
+          if (permissionState === 'granted') {
+            window.addEventListener('deviceorientation', () => {
+                console.log(event);
+                  var absolute = event.absolute;
+                  var alpha    = event.alpha;
+                  var beta     = event.beta;
+                  var gamma    = event.gamma 
+                console.log("absolute", absolute);
+                console.log("alpha", alpha);
+                console.log("beta", beta);
+                console.log("gamma", gamma);
             });
-         } else {
-           console.log("No permissions to use AbsoluteOrientationSensor.");
-         }
-   });
+          }
+        })
+        .catch(console.error);
+    } else {
+        console.log("DeviceOrientation not available");
+      // handle regular non iOS 13+ devices
+    }
+}
 
+
+
+document.getElementById("request-perms").onclick = iOSGetOrientationPerms;
+
+if (!isIOS()) {
+    console.log("Initializing sensor for Android");
+    
+    const sensor = new window.AbsoluteOrientationSensor({frequency: 60, referenceFrame: 'device' })
+    sensor.start();
+    // constantly update altitude and azimuth in global state
+    sensor.addEventListener('reading', e => {
+        state.alt_az = compute_alt_az(sensor.quaternion)    
+    });
+}
+
+
+
+function isIOS() {
+    return /(iPad|iPhone|iPod)/g.test(navigator.userAgent);
+}
 
 
 function toAzimuth(vector) {
