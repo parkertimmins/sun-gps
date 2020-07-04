@@ -1,5 +1,5 @@
 
-
+// logging
 const con = window.console;
 const console = {
     log: function() {
@@ -95,13 +95,27 @@ const sin = (deg) => Math.sin(rad(deg)),
       PI = Math.PI;
 
 
-// constantly update altitude and azimuth in global state
-sensor = new AbsoluteOrientationSensor({frequency: 60, referenceFrame: 'device' })
-sensor.addEventListener('reading', e => {
-	state.alt_az = compute_alt_az(sensor.quaternion)    
-});
-sensor.start();
+console.log('window.AbsoluteOrientationSensor', typeof window.AbsoluteOrientationSensor !== 'undefined')
+console.log('AbsoluteOrientationSensor', typeof AbsoluteOrientationSensor !== 'undefined')
 
+
+let sensor = null;
+Promise.all([navigator.permissions.query({ name: "accelerometer" }),
+             navigator.permissions.query({ name: "magnetometer" }),
+             navigator.permissions.query({ name: "gyroscope" })])
+       .then(results => {
+         if (results.every(result => result.state === "granted")) {
+            sensor = new window.AbsoluteOrientationSensor({frequency: 60, referenceFrame: 'device' })
+            sensor.start();
+            
+            // constantly update altitude and azimuth in global state
+            sensor.addEventListener('reading', e => {
+                state.alt_az = compute_alt_az(sensor.quaternion)    
+            });
+         } else {
+           console.log("No permissions to use AbsoluteOrientationSensor.");
+         }
+   });
 
 
 
