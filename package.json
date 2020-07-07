@@ -1,0 +1,22 @@
+{
+  "name": "celestial-gps",
+  "version": "1.0.0",
+  "description": "Webapp which find location on earth from the sun and moon",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parkertimmins/celestial-gps.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/parkertimmins/celestial-gps/issues"
+  },
+  "homepage": "https://github.com/parkertimmins/celestial-gps#readme"
+}
