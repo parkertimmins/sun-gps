@@ -3,14 +3,18 @@
         <link rel="stylesheet" href="lib/leaflet.css" />
         <script src="lib/leaflet.js"></script>
 
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
 
 
         <link rel="stylesheet" type="text/css" href="index.css">
         <!--<script src="closure-library/closure/goog/base.js"></script>-->
     </head>
     <body>
-        <button id="show-camera">Camera</button>
-        <button id="show-map">Map</button>
+
+        <div class="control-row btn-group" role="group" aria-label="Top Control Row">
+            <button id="show-camera" type="button" class="btn btn-info">Camera</button>
+            <button id="show-map" type="button" class="btn btn-info">Map</button>
+        </div>
         
         <div id="map-pane"> 
             <div id="map"></div> 
@@ -22,12 +26,28 @@
             <!--<canvas id="canvas2"></canvas>-->
                 
             <select id="videoSource"></select>
-            <button id="find-location">Find Location</button>
+           
+            <div class="container-fluid control-row"> 
+                <div class="row">
+                    <button id="location" type="button" class="btn btn-secondary col-2">↻ &#x1f4f7;</button>
+                    <button id="find-location" type="button" class="btn btn-info col-10">Find Location</button>
+                </div>
+            </div>
+
         </div>
 
-        <button id="request-perms">Request Perms</button>
+
+
         <div id="logs">
         </div>
+
+
+        <div id="request-perms-modal" class="modal">
+            <div class="modal-content">
+                <button id="request-perms">Allow orientation sensor</button>
+            </div>
+        </div> 
+
         <script src="index.js"></script>
     </body>
 </html>

@@ -94,7 +94,12 @@ const sin = (deg) => Math.sin(rad(deg)),
       atan2 = (x, y) => degree(Math.atan2(x, y)),
       PI = Math.PI;
 
+
+
+document.getElementById("request-perms").onclick = iOSGetOrientationPerms;
 function iOSGetOrientationPerms() {
+    document.getElementById("request-perms-modal").style.display = 'none';
+    
     // feature detect
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
       DeviceOrientationEvent.requestPermission()
@@ -118,8 +123,6 @@ function iOSGetOrientationPerms() {
 }
 
 
-
-document.getElementById("request-perms").onclick = iOSGetOrientationPerms;
 
 if (!isIOS()) {
     console.log("Initializing sensor for Android");
@@ -553,8 +556,8 @@ function copyVideoToCanvas() {
 	// first copy frame from video element to canvas
 	ctx.drawImage(video, 0, 0);
 
-	ctx.strokeStyle = "#FF0000";
-	ctx.lineWidth = 3 
+	ctx.strokeStyle = "white";
+	ctx.lineWidth = 1 
 	ctx.beginPath();
 	ctx.moveTo(0, canvas.height / 2);
 	ctx.lineTo(canvas.width, canvas.height / 2);
@@ -700,6 +703,8 @@ function to_reg_long(long_w) {
 }
 
 
+
+
 window.onload = function() {
     
 	map = L.map('map', {
@@ -715,7 +720,7 @@ window.onload = function() {
 		const lat_long = [lat, to_reg_long(long)].map(n => n.toFixed(4))
 			
 		//const marker = L.marker([lat, long_reg]).addTo(map);	
-		const popup = L.popup()
+		const popup = L.popup({ closeOnClick: false, autoClose: false })
 			.setLatLng(lat_long)
 			.setContent(JSON.stringify(lat_long))
 			.openOn(map);
@@ -733,8 +738,11 @@ window.onload = function() {
 		document.getElementById("map-pane").style.display = 'block'
 		map.invalidateSize()
 	}
-    
-    
+   
+    // show modal to request perms i
+    //if (isIOS()) { 
+        document.getElementById("request-perms-modal").style.display = "block";
+    //}
 }
 
 function run_tests() {
