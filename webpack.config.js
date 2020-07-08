@@ -1,4 +1,5 @@
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyPlugin = require('copy-webpack-plugin');
 
 module.exports = {
     entry: [
@@ -6,7 +7,7 @@ module.exports = {
         './src/index.css'
     ],
     output: {
-        path: __dirname,
+        path: __dirname + '/dist',
         publicPath: '/',
         filename: 'bundle.js'
     },
@@ -35,6 +36,11 @@ module.exports = {
     plugins: [    
         new HtmlWebpackPlugin({
             template: './src/index.html'
+        }),
+        new CopyPlugin({
+          patterns: [
+            { from: 'natural-earth-data', to: 'natural-earth-data' },
+          ],
         })
     ]
 };

@@ -51,14 +51,14 @@ function fetchJSON(url) {
 }
 
 function loadBaseMap() {
-	fetchJSON('natural-earth-data/ne_50m_admin_0_sovereignty.geojson')
-		.then((data) => L.geoJSON(data, {color: 'green'}).addTo(map))
+	fetchJSON('./natural-earth-data/ne_50m_admin_0_sovereignty.geojson')
+		.then(data => L.geoJSON(data, {color: 'green'}).addTo(map))
 	
-	fetchJSON('natural-earth-data/ne_50m_admin_1_states_provinces_lines.geojson')
-		.then((data) => L.geoJSON(data, {color: 'green'}).addTo(map))
+	fetchJSON('./natural-earth-data/ne_50m_admin_1_states_provinces_lines.geojson')
+		.then(data => L.geoJSON(data, {color: 'green'}).addTo(map))
 
-	fetchJSON('natural-earth-data/ne_50m_populated_places_simple.geojson')
-		.then((data) => L.geoJSON(data, { 
+    fetchJSON('./natural-earth-data/ne_50m_populated_places_simple.geojson')
+		.then(data => L.geoJSON(data, { 
 			pointToLayer: (geoJsonPoint, latlng) => L.circle(latlng, {radius: 10000, color: 'green'})
 		}).addTo(map))
 }

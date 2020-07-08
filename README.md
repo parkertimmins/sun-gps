@@ -5,15 +5,10 @@ This is a webapp which can be used on a smart phone to find your location on ear
 Run locally
 * `npm run start:dev`
 
-Build and Deploy to github-pages
+Build 
 * `npm run build`
-* git checkout gh-pages
-* git add build.js images index.html
-* git commit -m 'Deploy'
-* git push
 
-
-
-
+Build and deploy to Github pages:
+* `npm run deploy`
 
 
