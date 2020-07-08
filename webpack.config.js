@@ -8,7 +8,7 @@ module.exports = {
     ],
     output: {
         path: __dirname + '/dist',
-        publicPath: '/',
+        publicPath: '/celestial-gps/',
         filename: 'bundle.js'
     },
     module: {
