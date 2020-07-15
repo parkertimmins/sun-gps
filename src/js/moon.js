@@ -1,5 +1,5 @@
 import { julianCenturies } from './julian';
-
+import { sin, cos, tan, atan, atan2, degree, rad } from './trig';
 
 const EARTH_RADIUS_KM = 6378.14
 
@@ -72,5 +72,13 @@ export class Moon {
         const longPre = long - a + b * cos(long + c) * tan(latPre)
         return [latPre, longPre]
     }
+}
+
+function sum(arr) {
+    let result = 0;
+    for (let a of arr) {
+        result += a;
+    }
+    return result;
 }
 

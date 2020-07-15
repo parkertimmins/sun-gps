@@ -18,6 +18,20 @@ body {
 	display: none;
 }
 
+#show-camera.round-button {
+    padding-bottom: 0.2em;
+    display: none;
+}
+
+.round-button {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    font-size: 2em;
+    background: black;
+    background: radial-gradient(grey, black);
+}
+
 /*
 button {
 	background-color: #4CAF50; 

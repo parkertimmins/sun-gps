@@ -6,8 +6,8 @@
     <body>
 
         <div class="control-row btn-group" role="group" aria-label="Top Control Row">
-            <button id="show-camera" type="button" class="btn btn-info">Camera</button>
-            <button id="show-map" type="button" class="btn btn-info">Map</button>
+            <button id="show-camera" type="button" class="round-button" title="Go to Camera view">📷</button>
+            <button id="show-map" type="button" class="round-button" "Go to Map view">🌎</button>
         </div>
         
         <div id="map-pane"> 
@@ -19,12 +19,11 @@
             <canvas id="canvas1"></canvas>
             <!--<canvas id="canvas2"></canvas>-->
                 
-            <select id="videoSource"></select>
-           
             <div class="container-fluid control-row"> 
                 <div class="row">
-                    <button id="location" type="button" class="btn btn-secondary col-2">↻ &#x1f4f7;</button>
-                    <button id="find-location" type="button" class="btn btn-info col-10">Find Location</button>
+                    <button id="switch-camera" type="button" class="round-button">🔄</button>
+                    <button id="find-location-moon" type="button" class="round-button" title="Find location by Moon">🌘</button>
+                    <button id="find-location-sun" type="button" class="round-button" title="Find location by Sun">☀️ </button>
                 </div>
             </div>
 

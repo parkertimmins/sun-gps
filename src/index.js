@@ -2,6 +2,7 @@ import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css';
 import { julianCenturies, toJulian } from './js/julian';
 import { Moon } from './js/moon';
+import { moonComputeLocation } from './js/celestial';
 
 // logging
 const con = window.console;
@@ -30,7 +31,10 @@ const state = {
 
 
 const video = document.querySelector('video');
-const videoSelect = document.querySelector('select#videoSource');
+
+const cameras = [];
+let selectedCameraIdx = null;
+
 
 const canvas1 = document.getElementById('canvas1');
 const ctx1 = canvas1.getContext('2d');
@@ -129,13 +133,10 @@ function initVideo() {
         .then(() => {
 	        navigator.mediaDevices
                 .enumerateDevices()
-                .then(addVideoDevicesToSelect)
+                .then(addVideoDevicesToCameraList)
                 .then(setSelectedStream)
                 .catch(handleError);
         })
-
-	videoSelect.onchange = setSelectedStream;
-	
 }
 
 function setSelectedStream() {
@@ -262,7 +263,7 @@ function setVideoToSelectedStream() {
   	}
 
 	const constraints = {
-		video: { deviceId: videoSelect.value  }
+		video: { deviceId: cameras[selectedCameraIdx].deviceId  }
   	};
 
   	return navigator.mediaDevices
@@ -277,17 +278,22 @@ function handleError(error) {
     console.error('Error: ', error);
 }
 
-function addVideoDevicesToSelect(deviceInfos) {
+function addVideoDevicesToCameraList(deviceInfos) {
 	for (let i = 0; i !== deviceInfos.length; ++i) {
 		const deviceInfo = deviceInfos[i];
 		
 		if (deviceInfo.kind === 'videoinput') {
-			const option = document.createElement('option');
-			option.value = deviceInfo.deviceId;
-			option.text = deviceInfo.label || 'camera ' + (i + 1)
-			videoSelect.appendChild(option);
+            cameras.push(deviceInfo);
+
+            // use this camera if is back camera
+            if (deviceInfo.label && deviceInfo.label.toLowerCase().includes("back")) {
+                selectedCameraIdx = cameras.length - 1;
+            }
 		}
 	}
+    if (selectedCameraIdx == null) {
+        selectedCameraIdx = 0;
+    }
 }
 
 function hasGetUserMedia() {
@@ -304,7 +310,7 @@ window.onload = function() {
 	loadBaseMap();
 	initVideo();
 
-	document.getElementById("find-location").onclick = () => {
+	document.getElementById("find-location-moon").onclick = () => {
 		const { lat, long } = moonComputeLocation(state.altAz, Date.now())
 		const latLong = [lat, toRegLong(long)].map(n => n.toFixed(4))
 			
@@ -320,13 +326,22 @@ window.onload = function() {
 	document.getElementById("show-camera").onclick = () => {
 		document.getElementById("camera-pane").style.display = 'block'
 		document.getElementById("map-pane").style.display = 'none'
+		document.getElementById("show-map").style.display = 'block'
+		document.getElementById("show-camera").style.display = 'none'
 	}
 
 	document.getElementById("show-map").onclick = () => {
 		document.getElementById("camera-pane").style.display = 'none'
 		document.getElementById("map-pane").style.display = 'block'
+		document.getElementById("show-map").style.display = 'none'
+		document.getElementById("show-camera").style.display = 'block'
 		map.invalidateSize()
 	}
+	
+    document.getElementById("switch-camera").onclick = () => {
+        selectedCameraIdx = (selectedCameraIdx + 1) % cameras.length;
+        setSelectedStream();
+    }
    
     // show modal to request perms i
     //if (isIOS()) { 

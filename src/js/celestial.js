@@ -1,18 +1,10 @@
 import { julianCenturies, toJulian, J2000 } from './julian';
 import { Moon } from './moon';
 import { Quaternion } from './quaternion';
+import { sin, cos, tan, atan, atan2, degree, rad } from './trig';
 
 
 const EARTH_OBLIQUITY = 23.4393 // epsilon
-const sin = (deg) => Math.sin(rad(deg)),
-      cos = (deg) => Math.cos(rad(deg)),
-      tan = (deg) => Math.tan(rad(deg)),
-      acos = (x) => degree(Math.acos(x)),
-      asin = (x) => degree(Math.asin(x)),
-      atan = (x) => degree(Math.atan(x)),
-      atan2 = (x, y) => degree(Math.atan2(x, y)),
-      PI = Math.PI;
-
 
 function toAzimuth(vector4) {
     // vector comes from a quaternion ... can throw away scalar 
@@ -36,14 +28,6 @@ function toAltitude(vector4) {
     const vecLenOnXYPlane = Math.sqrt(x**2 + y**2)
     const altitude = atan(z / vecLenOnXYPlane) 
     return altitude
-}
-
-function degree(rad) {
-    return rad * (180 / PI)
-}
-
-function rad(degree) {
-    return degree * PI / 180
 }
 
 function rightAscension(eclip) {
