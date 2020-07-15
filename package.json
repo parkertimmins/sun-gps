@@ -10,7 +10,8 @@
     "start:dev": "webpack-dev-server",
     "build": "webpack --mode=production",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "test": "mocha test --reporter min --require @babel/register"
   },
   "repository": {
     "type": "git",
@@ -23,17 +24,20 @@
   },
   "homepage": "https://parkertimmins.github.io/celestial-gps",
   "dependencies": {
+    "chai": "^4.2.0",
     "css-loader": "^3.6.0",
     "file-loader": "^6.0.0",
     "gh-pages": "^3.1.0",
     "html-webpack-plugin": "^4.3.0",
     "leaflet": "^1.6.0",
+    "mocha": "^8.0.1",
     "script-loader": "^0.7.2",
     "style-loader": "^1.2.1"
   },
   "devDependencies": {
     "@babel/core": "^7.10.4",
     "@babel/preset-env": "^7.10.4",
+    "@babel/register": "^7.10.4",
     "babel-loader": "^8.1.0",
     "copy-webpack-plugin": "^6.0.3",
     "webpack": "^4.43.0",
