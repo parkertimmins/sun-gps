@@ -72,38 +72,23 @@ function RequestPermsModal(props) {
 let idx = 0;
 
 
-class LeafletMap extends React.Component {
-    constructor(props) {
-        super(props);
-            this.mapRef = React.createRef();
-    }
-    
-    componentDidUpdate() {
-        this.mapRef.current.leafletElement.invalidateSize()
-    }
-
-    render() {
-        return (
-            <Map ref={this.mapRef} center={[24.944292, 0.202651]} zoom={2}>
-                <GeoJSON key="countries" data={this.props.countryJson} />
-                <GeoJSON key="states" data={this.props.stateJson} />
-            </Map>
-        );
-    }
-}
-
 class MapView extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            countryJson: null,
-            stateJson: null,
-            cityJson: null
+            countries: null,
+            states: null,
+            cities: null
         }
+        this.mapRef = React.createRef();
     }
 
     componentDidMount() {
         this.getGeoJSON();
+    }
+
+    componentDidUpdate() {
+        this.mapRef.current.leafletElement.invalidateSize()
     }
 
     fetchJSON(url) {
@@ -112,22 +97,20 @@ class MapView extends React.Component {
 
     getGeoJSON() {
         this.fetchJSON('./natural-earth-data/ne_50m_admin_0_sovereignty.geojson')
-            .then(data => this.setState({ countryJson: data }));
+            .then(data => this.setState({ countries: data }));
             //.then(data => L.geoJSON(data, {color: 'green'}).addTo(map))
         
         this.fetchJSON('./natural-earth-data/ne_50m_admin_1_states_provinces_lines.geojson')
-            .then(data => this.setState({ stateJson: data }));
+            .then(data => this.setState({ states: data }));
             //.then(data => L.geoJSON(data, {color: 'green'}).addTo(map))
 
         this.fetchJSON('./natural-earth-data/ne_50m_populated_places_simple.geojson')
-            .then(data => this.setState({ cityJson: data }));
+            .then(data => this.setState({ cities: data }));
             //.then(data => L.geoJSON(data, { 
              //   pointToLayer: (geoJsonPoint, latlng) => L.circle(latlng, {radius: 10000, color: 'green'})
             //}).addTo(map))
     }
 
-                //{ this.state.countryJson ?  <GeoJSON data={this.state.countryJson} /> : null } 
-//                { this.state.stateJson ?  <GeoJSON data={this.state.stateJson} /> : null } 
     render() {
         return (
             <div>
@@ -135,9 +118,10 @@ class MapView extends React.Component {
                     <button type="button" className="round-button" title="Go to Camera view" onClick={this.props.toggleCameraMap}>📷</button>
                 </div>
                 <div id="map-pane"> 
-                    { (this.state.countr&& this.state.states) && 
-                        <LeafletMap counties={this.state.countries} />
-                    }
+                    <Map ref={this.mapRef} center={[24.944292, 0.202651]} zoom={2}>
+                        {this.state.countries && <GeoJSON key="countries" data={this.state.countries} />}
+                        {this.state.states && <GeoJSON key="states" data={this.state.states} />}
+                    </Map>
                 </div>
             </div>
         );
