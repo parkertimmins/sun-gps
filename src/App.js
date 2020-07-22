@@ -12,6 +12,10 @@ import 'leaflet/dist/images/marker-shadow.png'
 
 import { Map, Marker, Popup, TileLayer, GeoJSON } from 'react-leaflet'
 
+import { julianCenturies, toJulian } from './js/julian';
+import { Moon } from './js/moon';
+import { sunComputeLocation, moonComputeLocation, computeAltAz } from './js/celestial';
+
 
 class App extends React.Component {
 
@@ -19,12 +23,11 @@ class App extends React.Component {
         super(props);
         this.state = {
             needUserPermission: true,
-            cameraVisible: true
+            cameraVisible: true,
         };
+	    this.altAz = null;
 
-        
         this.toggleCameraMap = this.toggleCameraMap.bind(this);
-
     }
 
     toggleCameraMap() {
@@ -33,6 +36,16 @@ class App extends React.Component {
 
     givePermission() {
         this.setState({ needUserPermission: false })
+    }
+
+    startAndriodSensor() {
+        console.log("Initializing sensor for Android");
+        const sensor = new window.AbsoluteOrientationSensor({frequency: 60, referenceFrame: 'device' })
+        sensor.start();
+        // constantly update altitude and azimuth in global state
+        sensor.addEventListener('reading', e => {
+            this.altAz = computeAltAz(sensor.quaternion)    
+        });
     }
 
     render() {
@@ -72,8 +85,6 @@ function RequestPermsModal(props) {
     );
 }
 
-
-let idx = 0;
 
 
 class MapView extends React.Component {
@@ -166,13 +177,15 @@ class CameraView extends React.Component {
         this.initVideo();
     } 
 
+    hasGetUserMedia() {
+        return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    }
+
     initVideo() {
-        /*
-        if (!hasGetUserMedia()) {
+        if (!this.hasGetUserMedia()) {
             alert('getUserMedia() is not supported by your browser');
             return;
         }
-        */
 
         // iphone request ask permission before enumerating devices
         navigator.mediaDevices
@@ -276,36 +289,7 @@ class CameraView extends React.Component {
 
 export default App;
 
-
-
-   /*    
-
-import { julianCenturies, toJulian } from './js/julian';
-import { Moon } from './js/moon';
-import { moonComputeLocation } from './js/celestial';
-
-
-
-const state = {
-	altAz: null
-}
-
-
-const video = document.querySelector('video');
-
-const cameras = [];
-let selectedCameraIdx = null;
-
-
-const canvas1 = document.getElementById('canvas1');
-const ctx1 = canvas1.getContext('2d');
-
-let map = null;
-
-//const canvas2 = document.getElementById('canvas2');
-//const ctx2 = canvas2.getContext('2d');
-
-
+/*    
 
 document.getElementById("request-perms").onclick = iOSGetOrientationPerms;
 function iOSGetOrientationPerms() {
@@ -333,7 +317,6 @@ function iOSGetOrientationPerms() {
 
 if (!isIOS()) {
     console.log("Initializing sensor for Android");
-    
     const sensor = new window.AbsoluteOrientationSensor({frequency: 60, referenceFrame: 'device' })
     sensor.start();
     // constantly update altitude and azimuth in global state
@@ -344,60 +327,6 @@ if (!isIOS()) {
 
 function isIOS() {
     return /(iPad|iPhone|iPod)/g.test(navigator.userAgent);
-}
-
-function initVideo() {
-    if (!hasGetUserMedia()) {
-        alert('getUserMedia() is not supported by your browser');
-        return;
-    }
-
-    // iphone request ask permission before enumerating devices
-	navigator.mediaDevices
-        .getUserMedia({ video: true })
-        .then(() => {
-	        navigator.mediaDevices
-                .enumerateDevices()
-                .then(addVideoDevicesToCameraList)
-                .then(setSelectedStream)
-                .catch(handleError);
-        })
-}
-
-function setSelectedStream() {
-	setVideoToSelectedStream()
-	setCanvasToSelectStream();
-}
-
-function timerCallback() {
-	copyVideoToCanvas();
-	setTimeout(timerCallback, 10);
-}
-
-function copyVideoToCanvas() {
-	
-	// should probably not do every frame ¯\_(ツ)_/¯
-	setCanvasDimensions();
-
-	if (canvas1.width === 0 || canvas1.height === 0) {
-		return;
-	}
-
-	const canvas = canvas1
-	const ctx = canvas.getContext("2d");
-	
-	// first copy frame from video element to canvas
-	ctx.drawImage(video, 0, 0);
-
-	ctx.strokeStyle = "white";
-	ctx.lineWidth = 1 
-	ctx.beginPath();
-	ctx.moveTo(0, canvas.height / 2);
-	ctx.lineTo(canvas.width, canvas.height / 2);
-	
-	ctx.moveTo(canvas.width / 2, 0);
-	ctx.lineTo(canvas.width / 2, canvas.height);
-	ctx.stroke();	
 }
 
 function pixelToRc(pixel, width) {
@@ -415,61 +344,6 @@ function avg(nums) {
 	return sum / parseFloat(nums.length)
 }
 
-// sets logically pixel width of canvas, not size of html element, hence works with width: 100% 
-function setCanvasDimensions() {
-	canvas1.width = video.videoWidth
-	canvas1.height = video.videoHeight
-	//canvas2.width = video.videoWidth
-	//canvas2.height = video.videoHeight
-}
-
-function setCanvasToSelectStream() {
-	console.log('calling setCanvasToSelectStream')
-	timerCallback();
-}
-
-function setVideoToSelectedStream() {
-	if (window.stream) {
-  		window.stream.getTracks().forEach(track => track.stop())
-  	}
-
-	const constraints = {
-		video: { deviceId: cameras[selectedCameraIdx].deviceId  }
-  	};
-
-  	return navigator.mediaDevices
-		.getUserMedia(constraints)
-		.then(stream => {
-			  window.stream = stream; // make stream available to console
-			  video.srcObject = stream;
-		})
-}
-
-function handleError(error) {
-    console.error('Error: ', error);
-}
-
-function addVideoDevicesToCameraList(deviceInfos) {
-	for (let i = 0; i !== deviceInfos.length; ++i) {
-		const deviceInfo = deviceInfos[i];
-		
-		if (deviceInfo.kind === 'videoinput') {
-            cameras.push(deviceInfo);
-
-            // use this camera if is back camera
-            if (deviceInfo.label && deviceInfo.label.toLowerCase().includes("back")) {
-                selectedCameraIdx = cameras.length - 1;
-            }
-		}
-	}
-    if (selectedCameraIdx == null) {
-        selectedCameraIdx = 0;
-    }
-}
-
-function hasGetUserMedia() {
-      return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-}
 
 window.onload = function() {
     
