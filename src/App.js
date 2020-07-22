@@ -14,7 +14,7 @@ import { Map, Marker, Popup, TileLayer, GeoJSON } from 'react-leaflet'
 
 import { julianCenturies, toJulian } from './js/julian';
 import { Moon } from './js/moon';
-import { sunComputeLocation, moonComputeLocation, computeAltAz } from './js/celestial';
+import { sunComputeLocation, moonComputeLocation, computeAltAz, toRegLong } from './js/celestial';
 
 
 class App extends React.Component {
@@ -24,10 +24,34 @@ class App extends React.Component {
         this.state = {
             needUserPermission: true,
             cameraVisible: true,
+            estimatedLocations: []
         };
 	    this.altAz = null;
 
         this.toggleCameraMap = this.toggleCameraMap.bind(this);
+        this.findByMoon = this.findByMoon.bind(this);
+        this.findBySun = this.findBySun.bind(this);
+    }
+
+    findBySun() {
+        
+    }
+    findByMoon() {
+		const position = moonComputeLocation(this.altAz, Date.now())
+        console.log("Adding position by moon", position);
+		//const latLong = [lat, toRegLong(long)].map(n => n.toFixed(4))
+        this.setState(prevState => ({
+            estimatedLocations: [...prevState.estimatedLocations, position]
+        }))
+        /*	
+		//const marker = L.marker([lat, longReg]).addTo(map);	
+		const popup = L.popup({ closeOnClick: false, autoClose: false })
+			.setLatLng(latLong)
+			.setContent(JSON.stringify(latLong))
+			.openOn(map);
+
+		map.setView(latLong, 5)
+        */
     }
 
     toggleCameraMap() {
@@ -36,9 +60,10 @@ class App extends React.Component {
 
     givePermission() {
         this.setState({ needUserPermission: false })
+        this.startAndroidSensor();
     }
 
-    startAndriodSensor() {
+    startAndroidSensor() {
         console.log("Initializing sensor for Android");
         const sensor = new window.AbsoluteOrientationSensor({frequency: 60, referenceFrame: 'device' })
         sensor.start();
@@ -56,11 +81,11 @@ class App extends React.Component {
         return ( 
             <>
                 <Tab hidden={!this.state.cameraVisible}>          
-                    <CameraView toggleCameraMap={this.toggleCameraMap} /> 
+                    <CameraView toggleCameraMap={this.toggleCameraMap} findByMoon={this.findByMoon} findBySun={this.findBySun} /> 
                 </Tab>
                 
                 <Tab hidden={this.state.cameraVisible}>
-                    <MapView toggleCameraMap={this.toggleCameraMap} /> 
+                    <MapView toggleCameraMap={this.toggleCameraMap} estimatedLocations={this.state.estimatedLocations} /> 
                 </Tab>
             </>
         );
@@ -127,6 +152,14 @@ class MapView extends React.Component {
     }
 
     render() {
+        const markers = this.props.estimatedLocations.map(({lat, long}, idx) => 
+            <Marker key={`marker-${idx}`} position={[lat, long]}>
+                <Popup>
+                    <span>{lat}, {long}</span>
+                </Popup>
+            </Marker>
+        );
+
         return (
             <div>
                 <div className="top-row control-row">
@@ -136,6 +169,7 @@ class MapView extends React.Component {
                     <Map ref={this.mapRef} center={[24.944292, 0.202651]} zoom={2}>
                         {this.state.countries && <GeoJSON key="countries" data={this.state.countries} />}
                         {this.state.states && <GeoJSON key="states" data={this.state.states} />}
+                        {markers}
                     </Map>
                 </div>
             </div>
@@ -155,9 +189,15 @@ class CameraView extends React.Component {
         this.setSelectedStream = this.setSelectedStream.bind(this);
         this.setCanvasToVideo = this.setCanvasToVideo.bind(this);
         this.copyVideoToCanvas = this.copyVideoToCanvas.bind(this);
+        this.switchCamera = this.switchCamera.bind(this);
 
         this.videoRef = React.createRef();
         this.canvasRef = React.createRef();
+    }
+
+    switchCamera() {
+        this.selectedCameraIdx = (this.selectedCameraIdx + 1) % this.cameras.length;
+        this.setVideoToSelectedStream();
     }
 
     addVideoDevicesToCameraList(deviceInfos) {
@@ -167,7 +207,7 @@ class CameraView extends React.Component {
 
                 // use this camera if is back camera
                 if (deviceInfo.label && deviceInfo.label.toLowerCase().includes("back")) {
-                    this.selectedCameraIdx = cameras.length - 1;
+                    this.selectedCameraIdx = this.cameras.length - 1;
                 }
             }
         }
@@ -278,9 +318,9 @@ class CameraView extends React.Component {
                 </div>
                         
                 <div className="bottom-row control-row"> 
-                    <button id="switch-camera" type="button" className="round-button">🔄</button>
-                    <button id="find-location-moon" type="button" className="round-button" title="Find location by Moon">🌘</button>
-                    <button id="find-location-sun" type="button" className="round-button" title="Find location by Sun">☀️ </button>
+                    <button onClick={this.switchCamera} type="button" className="round-button">🔄</button>
+                    <button onClick={this.props.findByMoon} type="button" className="round-button" title="Find location by Moon">🌘</button>
+                    <button onClick={this.props.findBySun} type="button" className="round-button" title="Find location by Sun">☀️ </button>
                 </div>
             </div>
         );
@@ -315,35 +355,9 @@ function iOSGetOrientationPerms() {
     }
 }
 
-if (!isIOS()) {
-    console.log("Initializing sensor for Android");
-    const sensor = new window.AbsoluteOrientationSensor({frequency: 60, referenceFrame: 'device' })
-    sensor.start();
-    // constantly update altitude and azimuth in global state
-    sensor.addEventListener('reading', e => {
-        state.altAz = computeAltAz(sensor.quaternion)    
-    });
-}
-
 function isIOS() {
     return /(iPad|iPhone|iPod)/g.test(navigator.userAgent);
 }
-
-function pixelToRc(pixel, width) {
-	const r = pixel / width
-	const c = pixel % width 
-	return [r, c]
-
-}
-
-function avg(nums) {
-	const sum = 0
-	for (let n of nums) {
-		sum += n
-	} 	
-	return sum / parseFloat(nums.length)
-}
-
 
 window.onload = function() {
     
@@ -359,16 +373,5 @@ window.onload = function() {
 
 		map.setView(latLong, 5)
 	}
-
-
-    document.getElementById("switch-camera").onclick = () => {
-        selectedCameraIdx = (selectedCameraIdx + 1) % cameras.length;
-        setSelectedStream();
-    }
-   
-    // show modal to request perms i
-    //if (isIOS()) { 
-        document.getElementById("request-perms-modal").style.display = "block";
-    //}
 }
 */

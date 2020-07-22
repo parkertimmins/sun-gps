@@ -40,13 +40,13 @@ body {
 }
 
 .round-button {
-    width: 150px;
-    height: 150px; 
     border-radius: 50%;
-    font-size: 4em;
+    width: 2.5em;
+    height: 2.5em; 
+    font-size: 2em;
+    
     background: black;
     background: radial-gradient(grey, black);
-    
     outline: none;
     border: none;
 }
@@ -88,10 +88,6 @@ button {
 }
 
 video {
-    /*
-    width: 100px;
-    height: 100px;
-    */
     width: 1px;
     height: 1px;
     opacity: 0;

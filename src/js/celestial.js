@@ -1,7 +1,7 @@
 import { julianCenturies, toJulian, J2000 } from './julian';
 import { Moon } from './moon';
-import { Quaternion } from './quaternion';
-import { sin, cos, tan, atan, atan2, degree, rad } from './trig';
+import { Quaternions } from './quaternion';
+import { sin, cos, tan, asin, atan, atan2, degree, rad, PI } from './trig';
 
 
 const EARTH_OBLIQUITY = 23.4393 // epsilon
@@ -80,7 +80,7 @@ function sunEclipLatLong(JD) {
     }
 } 
 
-function computeAltAz(sensorQuaternion) {
+export function computeAltAz(sensorQuaternion) {
     const deviceOriginVector = [0, 0, -1] 
     const quaternion = Quaternions.toInternalQuat(sensorQuaternion)
     const directionVec = Quaternions.rotate(deviceOriginVector, quaternion) 

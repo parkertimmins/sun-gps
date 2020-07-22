@@ -1,5 +1,5 @@
 
-class Quaternions {
+export class Quaternions {
     // internal [s, v] - external [v, s]
     static toInternalQuat(q) {
         return [q[3], q[0], q[1], q[2]]
