@@ -80,7 +80,41 @@ function sunEclipLatLong(JD) {
     }
 } 
 
-export function computeAltAz(sensorQuaternion) {
+// https://www.w3.org/TR/orientation-event/#biblio-eulerangles
+function getQuaternion(alpha, beta, gamma) {
+
+  var _x = beta  || 0; // beta value
+  var _y = gamma || 0; // gamma value
+  var _z = alpha || 0; // alpha value
+
+  var cX = cos( _x/2 );
+  var cY = cos( _y/2 );
+  var cZ = cos( _z/2 );
+  var sX = sin( _x/2 );
+  var sY = sin( _y/2 );
+  var sZ = sin( _z/2 );
+
+  //
+  // ZXY quaternion construction.
+  //
+
+  var w = cX * cY * cZ - sX * sY * sZ;
+  var x = sX * cY * cZ - cX * sY * sZ;
+  var y = cX * sY * cZ + sX * cY * sZ;
+  var z = cX * cY * sZ + sX * sY * cZ;
+
+  return [ w, x, y, z ];
+}
+
+export function computeAltAzFromABG(alpha, beta, gamma, compass) {
+    const deviceOriginVector = [0, 0, -1] 
+    const quaternion = getQuaternion(alpha, beta, gamma); 
+    const directionVec = Quaternions.rotate(deviceOriginVector, quaternion) 
+    const altitude = toAltitude(directionVec)
+    return { altitude, compass }
+}
+
+export function computeAltAzFromQuat(sensorQuaternion) {
     const deviceOriginVector = [0, 0, -1] 
     const quaternion = Quaternions.toInternalQuat(sensorQuaternion)
     const directionVec = Quaternions.rotate(deviceOriginVector, quaternion) 

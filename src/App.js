@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import { Map, Marker, Popup, TileLayer, GeoJSON } from 'react-leaflet'
 import { julianCenturies, toJulian } from './js/julian';
 import { Moon } from './js/moon';
-import { sunComputeLocation, moonComputeLocation, computeAltAz, toRegLatLong } from './js/celestial';
+import { sunComputeLocation, moonComputeLocation, computeAltAzFromQuat, computeAltAzFromABG, toRegLatLong } from './js/celestial';
 
 
 class App extends React.Component {
@@ -45,20 +45,54 @@ class App extends React.Component {
         this.setState({ cameraVisible: !this.state.cameraVisible })
     }
 
-    givePermission() {
-        this.setState({ needUserPermission: false })
-        this.startAndroidSensor();
+    isIOS() {
+        return /(iPad|iPhone|iPod)/g.test(navigator.userAgent);
     }
 
-    startAndroidSensor() {
+    givePermission() {
+        this.setState({ needUserPermission: false })
+
+        if (this.isIOS()) {
+            this.startIphoneOrientationSensor();
+        } else {
+            this.startAndroidOrientationSensor();
+        }
+    }
+
+    startAndroidOrientationSensor() {
         console.log("Initializing sensor for Android");
         const sensor = new window.AbsoluteOrientationSensor({frequency: 60, referenceFrame: 'device' })
         sensor.start();
         // constantly update altitude and azimuth in global state
-        sensor.addEventListener('reading', e => {
-            this.altAz = computeAltAz(sensor.quaternion)    
+        sensor.addEventListener('reading', () => {
+            this.altAz = computeAltAzFromQuat(sensor.quaternion)    
         });
     }
+
+    startIphoneOrientationSensor() {
+        console.log("Initializing sensor for iPhone");
+        
+        // feature detect
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+            DeviceOrientationEvent.requestPermission()
+                .then(permissionState => {
+                    if (permissionState === 'granted') {
+                        window.addEventListener('deviceorientation', () => {
+                            this.altAz = computeAltAzFromABG(event.alpha, event.beta, event.gamma, event.webkitCompassHeading);
+                            console.log("alpha", event.alpha);
+                            console.log("beta", event.beta);
+                            console.log("gamma", event.gamma);
+                            console.log("webkitCompassHeading", event.webkitCompassHeading);
+                        });
+                    }
+                })
+                .catch(console.error);
+        } else {
+            alert("DeviceOrientation not available");
+          // handle regular non iOS 13+ devices
+        }
+    }
+
 
     render() {
         if (this.state.needUserPermission) {
@@ -96,8 +130,6 @@ function RequestPermsModal(props) {
         </div> 
     );
 }
-
-
 
 class MapView extends React.Component {
     constructor(props) {
@@ -316,33 +348,3 @@ class CameraView extends React.Component {
 
 export default App;
 
-/*    
-
-document.getElementById("request-perms").onclick = iOSGetOrientationPerms;
-function iOSGetOrientationPerms() {
-    document.getElementById("request-perms-modal").style.display = 'none';
-    
-    // feature detect
-    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission()
-        .then(permissionState => {
-          if (permissionState === 'granted') {
-            window.addEventListener('deviceorientation', () => {
-                console.log("alpha", event.alpha);
-                console.log("beta", event.beta);
-                console.log("gamma", event.gamma);
-                console.log("webkitCompassHeading", event.webkitCompassHeading);
-            });
-          }
-        })
-        .catch(console.error);
-    } else {
-        console.log("DeviceOrientation not available");
-      // handle regular non iOS 13+ devices
-    }
-}
-
-function isIOS() {
-    return /(iPad|iPhone|iPod)/g.test(navigator.userAgent);
-}
-*/
