@@ -31,10 +31,12 @@ class App extends React.Component {
     }
 
     findBySun() {
+        console.log("Altitude/Azimuth", this.altAz);
 		this.addLatLong(sunComputeLocation(this.altAz, Date.now()));
     }
 
     findByMoon() {
+        console.log("Altitude/Azimuth", this.altAz);
 		this.addLatLong(moonComputeLocation(this.altAz, Date.now()));
     }
 
