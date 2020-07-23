@@ -111,7 +111,7 @@ export function computeAltAzFromABG(alpha, beta, gamma, compass) {
     const quaternion = getQuaternion(alpha, beta, gamma); 
     const directionVec = Quaternions.rotate(deviceOriginVector, quaternion) 
     const altitude = toAltitude(directionVec)
-    return { altitude, compass }
+    return { altitude, azimuth: compass }
 }
 
 export function computeAltAzFromQuat(sensorQuaternion) {
