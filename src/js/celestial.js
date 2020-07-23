@@ -129,8 +129,6 @@ function computeLocation(altAz, jd, eclipLatLong, parallaxAngle) {
         long: raToLong(jd, ra),
         lat: dec
     }
-    //console.log(toRegLatLong(p))
-
 
     const hereToP = 90 - altitude - parallaxAngle
  
@@ -191,7 +189,7 @@ function altitudeRefractionCorrection(h0) {
     return rMinutes / 60
 }
 
-function toRegLatLong(latLong) {
+export function toRegLatLong(latLong) {
     return {
         lat: latLong.lat,
         long: toRegLong(latLong.long)

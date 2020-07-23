@@ -2,19 +2,10 @@
 import React from 'react';
 import 'leaflet/dist/leaflet.css';
 
-/*
-import 'leaflet/dist/images/layers-2x.png'
-import 'leaflet/dist/images/layers.png'
-import 'leaflet/dist/images/marker-icon-2x.png'
-import 'leaflet/dist/images/marker-icon.png'
-import 'leaflet/dist/images/marker-shadow.png'
- */     
-
 import { Map, Marker, Popup, TileLayer, GeoJSON } from 'react-leaflet'
-
 import { julianCenturies, toJulian } from './js/julian';
 import { Moon } from './js/moon';
-import { sunComputeLocation, moonComputeLocation, computeAltAz, toRegLong } from './js/celestial';
+import { sunComputeLocation, moonComputeLocation, computeAltAz, toRegLatLong } from './js/celestial';
 
 
 class App extends React.Component {
@@ -34,24 +25,20 @@ class App extends React.Component {
     }
 
     findBySun() {
-        
+		this.addLatLong(sunComputeLocation(this.altAz, Date.now()));
     }
-    findByMoon() {
-		const position = moonComputeLocation(this.altAz, Date.now())
-        console.log("Adding position by moon", position);
-		//const latLong = [lat, toRegLong(long)].map(n => n.toFixed(4))
-        this.setState(prevState => ({
-            estimatedLocations: [...prevState.estimatedLocations, position]
-        }))
-        /*	
-		//const marker = L.marker([lat, longReg]).addTo(map);	
-		const popup = L.popup({ closeOnClick: false, autoClose: false })
-			.setLatLng(latLong)
-			.setContent(JSON.stringify(latLong))
-			.openOn(map);
 
-		map.setView(latLong, 5)
-        */
+    findByMoon() {
+		this.addLatLong(moonComputeLocation(this.altAz, Date.now()));
+    }
+
+    addLatLong(latLongWest) {
+        const {lat, long} = toRegLatLong(latLongWest)
+        console.log("Adding position", lat, long);
+		const latLong = [lat, long].map(n => n.toFixed(4))
+        this.setState(prevState => ({
+            estimatedLocations: [...prevState.estimatedLocations, latLong]
+        }))
     }
 
     toggleCameraMap() {
@@ -152,21 +139,25 @@ class MapView extends React.Component {
     }
 
     render() {
-        const markers = this.props.estimatedLocations.map(({lat, long}, idx) => 
-            <Marker key={`marker-${idx}`} position={[lat, long]}>
-                <Popup>
-                    <span>{lat}, {long}</span>
+        const markers = this.props.estimatedLocations.map((position, idx) => 
+            <Marker key={`marker-${idx}`} position={position}>
+                <Popup closeOnClick={false} autoClose={false}>
+                    <span>{position[0]}, {position[1]}</span>
                 </Popup>
             </Marker>
         );
-
+        
+        const locations = this.props.estimatedLocations;
+        const center = locations.length ? locations[locations.length - 1] :  [24.944292, 0.202651]; // center of world map
+        const zoom = locations.length ? 5 : 2; // zoom in on new pin 
+        
         return (
             <div>
                 <div className="top-row control-row">
                     <button type="button" className="round-button" title="Go to Camera view" onClick={this.props.toggleCameraMap}>📷</button>
                 </div>
                 <div id="map-pane"> 
-                    <Map ref={this.mapRef} center={[24.944292, 0.202651]} zoom={2}>
+                    <Map ref={this.mapRef} center={center} zoom={zoom}>
                         {this.state.countries && <GeoJSON key="countries" data={this.state.countries} />}
                         {this.state.states && <GeoJSON key="states" data={this.state.states} />}
                         {markers}
@@ -235,7 +226,7 @@ class CameraView extends React.Component {
                     .enumerateDevices()
                     .then(this.addVideoDevicesToCameraList)
                     .then(this.setSelectedStream) // ????
-                    .catch(this.handleError);
+                    .catch(console.error);
             })
     }
 
@@ -264,10 +255,6 @@ class CameraView extends React.Component {
     setCanvasToVideo() {
         this.copyVideoToCanvas();
         setTimeout(this.setCanvasToVideo, 10);
-    }
-
-    handleError(error) {
-        console.error('Error: ', error);
     }
 
     copyVideoToCanvas() {
@@ -357,21 +344,5 @@ function iOSGetOrientationPerms() {
 
 function isIOS() {
     return /(iPad|iPhone|iPod)/g.test(navigator.userAgent);
-}
-
-window.onload = function() {
-    
-	document.getElementById("find-location-moon").onclick = () => {
-		const { lat, long } = moonComputeLocation(state.altAz, Date.now())
-		const latLong = [lat, toRegLong(long)].map(n => n.toFixed(4))
-			
-		//const marker = L.marker([lat, longReg]).addTo(map);	
-		const popup = L.popup({ closeOnClick: false, autoClose: false })
-			.setLatLng(latLong)
-			.setContent(JSON.stringify(latLong))
-			.openOn(map);
-
-		map.setView(latLong, 5)
-	}
 }
 */
