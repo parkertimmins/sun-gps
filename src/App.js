@@ -85,10 +85,7 @@ class App extends React.Component {
                     if (permissionState === 'granted') {
                         window.addEventListener('deviceorientation', () => {
                             this.altAz = computeAltAzFromABG(event.alpha, event.beta, event.gamma, event.webkitCompassHeading);
-                            console.log("alpha", event.alpha);
-                            console.log("beta", event.beta);
-                            console.log("gamma", event.gamma);
-                            console.log("webkitCompassHeading", event.webkitCompassHeading);
+                            console.log('altAz', this.altAz)
                         });
                     }
                 })
