@@ -149,6 +149,22 @@ function toLatLong(eclipLatLong, jd) {
     }
 }
 
+// Find angle between pole being used and celestial point
+// azimuth only works directly is using north pole and celestial object is east of here
+function azimuthToHereAngle(azimuth, celestialIsToWest, useNorthPole) {
+    if (useNorthPole) {
+        return celestialIsToWest ? 360 - azimuth : azimuth; 
+    } else {
+        return celestialIsToWest ? azimuth - 180 : 180 - azimuth; 
+    }
+}
+
+/*
+    Compute current location based on the observed altitude and azimuth of a 
+    celestial object, the known ecliptic latitude and longitude of the celestial
+    object, the current julian date (to compute the ra/dec of the celestial object),
+    and the known parallax angle of the object at this time
+*/
 function computeLocation(altAz, jd, eclipLatLong, parallaxAngle) {
     
 	let { altitude, azimuth } = altAz
@@ -159,49 +175,48 @@ function computeLocation(altAz, jd, eclipLatLong, parallaxAngle) {
     const dec = declination(eclipLatLong)
 
     // nearest point to celestial object
-    const p = {
+    const celestial = {
         long: raToLong(jd, ra),
         lat: dec
     }
 
-    const hereToP = 90 - altitude - parallaxAngle
- 
+    const hereToCelestial = 90 - altitude - parallaxAngle
+
     // https://en.wikipedia.org/wiki/Solution_of_triangles#Two_sides_and_the_included_angle_given_
-    const poleToP = 90 - p.lat 
+    const useNorthPole = celestial.lat < 0; // use pole on other side of equator
+    const celestialIsToWest = 180 < azimuth && azimuth < 360; // things get weird if directly north or south
+    const poleToCelestial = useNorthPole ? 90 + (-celestial.lat) : 90 + celestial.lat  // use positive distances
+    const hereAngle = azimuthToHereAngle(azimuth, celestialIsToWest, useNorthPole);
 
-    if (poleToP > asin(sin(hereToP) * sin(azimuth))) {
-        const poleAngle = asin(sin(hereToP) * sin(azimuth) / sin(poleToP))
-        const poleToHere = compute3rdSubtendedAngle(poleAngle, azimuth, poleToP, hereToP)   
-
+    if (poleToCelestial > asin(sin(hereToCelestial) * sin(hereAngle))) {
+        const poleAngle = asin(sin(hereToCelestial) * sin(hereAngle) / sin(poleToCelestial))
+        const poleToHere = compute3rdSubtendedAngle(poleAngle, hereAngle, poleToCelestial, hereToCelestial)   
+    
+        const longOffset = celestialIsToWest ? -poleAngle : poleAngle
         const here = {
-            lat: 90 - poleToHere,
-            long: mod((p.long + poleAngle), 360)
+            lat: useNorthPole ? 90 - poleToHere : -90 + poleToHere,
+            long: mod(celestial.long + longOffset, 360)
         }
 
-    /*
+        console.log('useNorthPole', useNorthPole);
+        console.log('celestialIsToWest', celestialIsToWest);
         console.log('altAz', altAz);
-        console.log('p', p);
+        console.log('celestial', celestial);
 	    console.log('altCorrection', altCorrection);
 		console.log('altitude', altitude);
-		console.log('B - azimuth', azimuth)
-    	console.log('c - dist here to p', hereToP)
-		console.log('b - poleToP', poleToP)
+		console.log('B - here angle', hereAngle)
+    	console.log('c - dist here to celestial', hereToCelestial)
+		console.log('b - poleToCelestial', poleToCelestial)
         console.log('angle at pole', poleAngle) 
         console.log('a - here to pole', poleToHere)
         console.log('here', here) 
         console.log('curr1', toRegLatLong(here))
-	*/	
-        return here
-        /*
-        if (b < c) {
-            const C_ = 180 - C 
-            const poleToHere = compute3rdSubtendedAngle(poleAngle, azimuth, poleToSun, hereToSun)   
-            const a_ = compute3rdSubtendedAngle(C_, B, b, c)   
-            const currLoc2 =  latLongFrom(a_, b, c)
-        
-            console.log('curr2', currLoc2) 
+       
+        if (Number.isNaN(here.lat) || Number.isNaN(here.lat)) {
+		    alert('Could not find a solution for you location. Perhaps you are not on earth?')
         }
-        */
+
+        return here
     } else {
 		alert('Could not find a solution for you location. Perhaps you are not on earth?')
     }
