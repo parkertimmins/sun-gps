@@ -159,6 +159,12 @@ function azimuthToHereAngle(azimuth, celestialIsToWest, useNorthPole) {
     }
 }
 
+// lat/long west 
+const MAGNETIC_NP = {
+    lat:  86.50,
+    long: 164.04
+}
+const GEO_NP_LAT = 90;
 /*
     Compute current location based on the observed altitude and azimuth of a 
     celestial object, the known ecliptic latitude and longitude of the celestial
@@ -180,18 +186,51 @@ function computeLocation(altAz, jd, eclipLatLong, parallaxAngle) {
         lat: dec
     }
 
-    const hereToCelestial = 90 - altitude - parallaxAngle
 
+    /* 
     // https://en.wikipedia.org/wiki/Solution_of_triangles#Two_sides_and_the_included_angle_given_
+    const celestialToMagNp = haversineDist(MAGNETIC_NP, celestial);
+    const useNorthPole = celestialToMagNp > 90; // use pole more than 90 degrees from celestial 
+    const celestialIsToWest = 180 < azimuth && azimuth < 360; // things get weird if directly north or south
+    const poleToCelestial = useNorthPole ? celestialToMagNp : 180 - celestialToMagNp  // use positive distances  
+    const hereAngle = azimuthToHereAngle(azimuth, celestialIsToWest, useNorthPole);
+
     const useNorthPole = celestial.lat < 0; // use pole on other side of equator
     const celestialIsToWest = 180 < azimuth && azimuth < 360; // things get weird if directly north or south
     const poleToCelestial = useNorthPole ? 90 + (-celestial.lat) : 90 + celestial.lat  // use positive distances
     const hereAngle = azimuthToHereAngle(azimuth, celestialIsToWest, useNorthPole);
+    */
 
-    if (poleToCelestial > asin(sin(hereToCelestial) * sin(hereAngle))) {
-        const poleAngle = asin(sin(hereToCelestial) * sin(hereAngle) / sin(poleToCelestial))
-        const poleToHere = compute3rdSubtendedAngle(poleAngle, hereAngle, poleToCelestial, hereToCelestial)   
+    const hereToCelestial = 90 - altitude - parallaxAngle
+    const celestialToMag = haversineDist(MAGNETIC_NP, celestial);
+    const magToGeo = GEO_NP_LAT - MAGNETIC_NP.lat;
+    const celestialToGeo = GEO_NP_LAT - celestial.lat;
+    const useNorthPole = celestialToMag >= 90; // use pole more than 90 degrees from celestial 
+    const celestialIsToWest = 180 < azimuth && azimuth < 360; // things get weird if directly north or south
+    const angleMagHereCel = azimuthToHereAngle(azimuth, celestialIsToWest, useNorthPole);
     
+    if (celestialToMag > asin(sin(hereToCelestial) * sin(angleMagHereCel))) {
+        const angleHereMagCel = asin(sin(hereToCelestial) * sin(angleMagHereCel) / sin(celestialToMag))
+        const magToHere = compute3rdSubtendedAngle(angleHereMagCel, angleMagHereCel, celestialToMag, hereToCelestial)   
+        const angleCelGeoMag = mod(MAGNETIC_NP.long - celestial.long, 360);
+
+        // sin(angleHereMagCel) / sin(hereToCelestial) == sin(angleHereCelMag) / sin(magToHere)
+        const angleHereCelMag = asin(sin(magToHere) * sin(angleHereMagCel) / sin(hereToCelestial))
+
+        // sin(angleCelGeoMag) / sin(celestialToMag) == sin(angleMagCelPole) / sin(magToGeo)
+        const angleMagCelPole = asin(sin(magToGeo) * sin(angleCelGeoMag) / sin(celestialToMag))
+        
+        const angleHereCelGeo = angleHereCelMag + angleMagCelPole;
+
+        // https://en.wikipedia.org/wiki/Solution_of_triangles#Two_sides_and_the_included_angle_given_(spherical_SAS)
+        const hereToGeo = sas_triangle(hereToCelestial, celestialToGeo, angleHereCelGeo)
+
+        const angleCelGeoHere = asin(sin(hereToCelestial) * sin(angleHereCelGeo) / sin(hereToGeo))
+
+    
+        const poleAngle = angleCelGeoHere;
+        const poleToHere = hereToGeo;
+
         const longOffset = celestialIsToWest ? -poleAngle : poleAngle
         const here = {
             lat: useNorthPole ? 90 - poleToHere : -90 + poleToHere,
@@ -204,9 +243,9 @@ function computeLocation(altAz, jd, eclipLatLong, parallaxAngle) {
         console.log('celestial', celestial);
 	    console.log('altCorrection', altCorrection);
 		console.log('altitude', altitude);
-		console.log('B - here angle', hereAngle)
+		console.log('B - angleMagHereCel', angleMagHereCel)
     	console.log('c - dist here to celestial', hereToCelestial)
-		console.log('b - poleToCelestial', poleToCelestial)
+		console.log('b - celestialToMag', celestialToMag)
         console.log('angle at pole', poleAngle) 
         console.log('a - here to pole', poleToHere)
         console.log('here', here) 
@@ -220,6 +259,23 @@ function computeLocation(altAz, jd, eclipLatLong, parallaxAngle) {
     } else {
 		alert('Could not find a solution for you location. Perhaps you are not on earth?')
     }
+}
+
+// https://en.wikipedia.org/wiki/Solution_of_triangles#Two_sides_and_the_included_angle_given_(spherical_SAS)
+// g is angle between and b
+function sasTriangle(a, b, g) {
+    return atan(Math.sqrt((sin(a) * cos(b) - cos(a) * sin(b) * cos(g)) ** 2 + (sin(b) * sin(g)) ** 2) / (cos(a) * cos(b) + sin(a) * sin(b) * cos(g)))
+}
+
+// https://www.movable-type.co.uk/scripts/gis-faq-5.1.html
+// returns angle of arc subtended by earth
+// returns non-negatives value
+function haversineDist(p1, p2) {
+    const dlon = p2.long - p1.long; 
+    const dlat = p2.lat - p1.lat; 
+    const a = sin(dlat/2)**2 + cos(p1.lat) * cos(p2.lat) * sin(dlon/2)**2;
+    const c = 2 * asin(Math.min(1, Math.sqrt(a)));
+    return c;
 }
 
 function mod(m, n) {
