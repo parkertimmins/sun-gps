@@ -11,7 +11,7 @@ import 'leaflet/dist/images/marker-shadow.png';
 import { Map, Marker, Popup, TileLayer, GeoJSON } from 'react-leaflet'
 import { julianCenturies, toJulian } from './js/julian';
 import { Moon } from './js/moon';
-import { sunComputeLocation, moonComputeLocation, computeAltAzFromQuat, computeAltAzFromABG, toRegLatLong } from './js/celestial';
+import { sunComputeLocation, moonComputeLocation, computeAltAzFromQuat, computeAltAzFromABG, toRegLatLong, MAGNETIC_NP } from './js/celestial';
 
 
 class App extends React.Component {
@@ -21,7 +21,8 @@ class App extends React.Component {
         this.state = {
             needUserPermission: true,
             cameraVisible: true,
-            estimatedLocations: []
+            estimatedLocations: [],
+            celestialLocation: null
         };
 	    this.altAz = null;
 
@@ -40,14 +41,16 @@ class App extends React.Component {
 		this.addLatLong(moonComputeLocation(this.altAz, Date.now()));
     }
 
-    addLatLong(latLongWest) {
-        const {lat, long} = toRegLatLong(latLongWest)
-        console.log("Adding position", lat, long);
-		const latLong = [lat, long].map(n => n.toFixed(4))
+    addLatLong(reading) {
+		const hereLatLong = markerLatLong(reading.here); 
+        console.log("Adding position", reading.here); 
         this.setState(prevState => ({
-            estimatedLocations: [...prevState.estimatedLocations, latLong]
+            estimatedLocations: [...prevState.estimatedLocations, hereLatLong]
         }))
+        this.setState({ celestialLocation: markerLatLong(reading.celestial) })
     }
+
+    
 
     toggleCameraMap() {
         this.setState({ cameraVisible: !this.state.cameraVisible })
@@ -55,6 +58,7 @@ class App extends React.Component {
 
     isIOS() {
         return /(iPad|iPhone|iPod)/g.test(navigator.userAgent);
+
     }
 
     givePermission() {
@@ -110,11 +114,17 @@ class App extends React.Component {
                 </Tab>
                 
                 <Tab hidden={this.state.cameraVisible}>
-                    <MapView toggleCameraMap={this.toggleCameraMap} estimatedLocations={this.state.estimatedLocations} /> 
+                    <MapView toggleCameraMap={this.toggleCameraMap} estimatedLocations={this.state.estimatedLocations} celestialLocation={this.state.celestialLocation}/> 
                 </Tab>
             </>
         );
     }
+}
+
+function markerLatLong(latLongWest) {
+    const { lat, long } = toRegLatLong(latLongWest);
+    console.log('markerLatLong', lat, long)
+    return [lat, long].map(n => n.toFixed(4))
 }
 
 function Tab(props) {
@@ -175,13 +185,9 @@ class MapView extends React.Component {
     }
 
     render() {
-        const markers = this.props.estimatedLocations.map((position, idx) => 
-            <Marker key={`marker-${idx}`} position={position}>
-                <Popup closeOnClick={false} autoClose={false}>
-                    <span>{position[0]}, {position[1]}</span>
-                </Popup>
-            </Marker>
-        );
+        const markers = this.props.estimatedLocations.map((position, idx) => <LocationMarker keyValue={`marker-${idx}`} position={position} label={"Estimated Location"} />)
+        const celestialMarker = this.props.celestialLocation ? <LocationMarker keyValue={`celestial-marker`} position={this.props.celestialLocation} label={"Celestial Object"}/> : null;
+        const magneticPoleMarker = <LocationMarker keyValue={`mag-pole-marker`} position={markerLatLong(MAGNETIC_NP)} label={"Magnetic North Pole"} />;
         
         const locations = this.props.estimatedLocations;
         const center = locations.length ? locations[locations.length - 1] :  [24.944292, 0.202651]; // center of world map
@@ -197,6 +203,8 @@ class MapView extends React.Component {
                         {this.state.countries && <GeoJSON key="countries" data={this.state.countries} />}
                         {this.state.states && <GeoJSON key="states" data={this.state.states} />}
                         {markers}
+                        {celestialMarker}
+                        {magneticPoleMarker}
                     </Map>
                 </div>
             </div>
@@ -204,6 +212,15 @@ class MapView extends React.Component {
     }
     
 }
+
+function LocationMarker({ keyValue, position, label}) {
+    return <Marker key={keyValue} position={position}>
+                <Popup closeOnClick={false} autoClose={false}>
+                    <span>{label}: {position[0]}, {position[1]}</span>
+                </Popup>
+            </Marker>
+}
+
 
 class CameraView extends React.Component {
     constructor(props) {

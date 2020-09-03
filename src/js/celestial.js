@@ -3,8 +3,14 @@ import { Moon } from './moon';
 import { Quaternions } from './quaternion';
 import { sin, cos, tan, asin, atan, atan2, degree, rad, PI } from './trig';
 
-
 const EARTH_OBLIQUITY = 23.4393 // epsilon
+
+// lat/long west 
+export const MAGNETIC_NP = {
+    lat:  86.50,
+    long: 164.04
+}
+
 
 function toAzimuth(vector4) {
     // vector comes from a quaternion ... can throw away scalar 
@@ -128,14 +134,14 @@ export function sunComputeLocation(altAz, date) {
     const sunLoc = sunEclipLatLong(jd)
     // estimate based on asumption that sun at infinite distance
     const parallaxAngle = 0
-    return computeLocation(altAz, jd, sunLoc, parallaxAngle)
+    return computeLocation(altAz, jd, sunLoc, parallaxAngle);
 }
 
 export function moonComputeLocation(altAz, date) {
     const jd = toJulian(date)
     const moonLoc = Moon.eclipLatLong(jd)
     const parallaxAngle = Moon.horizontalParallaxJd(jd) 
-    return computeLocation(altAz, jd, moonLoc, parallaxAngle)
+    return computeLocation(altAz, jd, moonLoc, parallaxAngle);
 }
 
 function toLatLong(eclipLatLong, jd) {  
@@ -159,12 +165,7 @@ function azimuthToHereAngle(azimuth, celestialIsToWest, useNorthPole) {
     }
 }
 
-// lat/long west 
-const MAGNETIC_NP = {
-    lat:  86.50,
-    long: 164.04
-}
-const GEO_NP_LAT = 90;
+
 /*
     Compute current location based on the observed altitude and azimuth of a 
     celestial object, the known ecliptic latitude and longitude of the celestial
@@ -186,85 +187,67 @@ function computeLocation(altAz, jd, eclipLatLong, parallaxAngle) {
         lat: dec
     }
 
-
-    /* 
-    // https://en.wikipedia.org/wiki/Solution_of_triangles#Two_sides_and_the_included_angle_given_
-    const celestialToMagNp = haversineDist(MAGNETIC_NP, celestial);
-    const useNorthPole = celestialToMagNp > 90; // use pole more than 90 degrees from celestial 
-    const celestialIsToWest = 180 < azimuth && azimuth < 360; // things get weird if directly north or south
-    const poleToCelestial = useNorthPole ? celestialToMagNp : 180 - celestialToMagNp  // use positive distances  
-    const hereAngle = azimuthToHereAngle(azimuth, celestialIsToWest, useNorthPole);
-
-    const useNorthPole = celestial.lat < 0; // use pole on other side of equator
-    const celestialIsToWest = 180 < azimuth && azimuth < 360; // things get weird if directly north or south
-    const poleToCelestial = useNorthPole ? 90 + (-celestial.lat) : 90 + celestial.lat  // use positive distances
-    const hereAngle = azimuthToHereAngle(azimuth, celestialIsToWest, useNorthPole);
-    */
-
     const hereToCelestial = 90 - altitude - parallaxAngle
     const celestialToMag = haversineDist(MAGNETIC_NP, celestial);
-    const magToGeo = GEO_NP_LAT - MAGNETIC_NP.lat;
-    const celestialToGeo = GEO_NP_LAT - celestial.lat;
-    const useNorthPole = celestialToMag >= 90; // use pole more than 90 degrees from celestial 
+    const useNorthPole = true; 
     const celestialIsToWest = 180 < azimuth && azimuth < 360; // things get weird if directly north or south
-    const angleMagHereCel = azimuthToHereAngle(azimuth, celestialIsToWest, useNorthPole);
-    
-    if (celestialToMag > asin(sin(hereToCelestial) * sin(angleMagHereCel))) {
-        const angleHereMagCel = asin(sin(hereToCelestial) * sin(angleMagHereCel) / sin(celestialToMag))
-        const magToHere = compute3rdSubtendedAngle(angleHereMagCel, angleMagHereCel, celestialToMag, hereToCelestial)   
-        const angleCelGeoMag = mod(MAGNETIC_NP.long - celestial.long, 360);
+    const hereAngle = azimuthToHereAngle(azimuth, celestialIsToWest, useNorthPole);
+    const bearingCelToMag = bearing(celestial, MAGNETIC_NP); 
 
-        // sin(angleHereMagCel) / sin(hereToCelestial) == sin(angleHereCelMag) / sin(magToHere)
-        const angleHereCelMag = asin(sin(magToHere) * sin(angleHereMagCel) / sin(hereToCelestial))
+    if (celestialToMag > asin(sin(hereToCelestial) * sin(hereAngle))) {
+        const magAngle = asin(sin(hereToCelestial) * sin(hereAngle) / sin(celestialToMag))
+        const magToHere = compute3rdSubtendedAngle(magAngle, hereAngle, celestialToMag, hereToCelestial)   
 
-        // sin(angleCelGeoMag) / sin(celestialToMag) == sin(angleMagCelPole) / sin(magToGeo)
-        const angleMagCelPole = asin(sin(magToGeo) * sin(angleCelGeoMag) / sin(celestialToMag))
-        
-        const angleHereCelGeo = angleHereCelMag + angleMagCelPole;
+        // sin(celAngle) / sin(magToHere) == sin(magAngle) / sin(hereToCelestial)
+        const celAngle = asin(sin(magToHere) * sin(magAngle) / sin(hereToCelestial)) // law of sines
+        const bearingCelToHere = celestialIsToWest == useNorthPole ? bearingCelToMag + celAngle : bearingCelToMag - celAngle;
+        const here = locationFromBearingDistance(celestial, bearingCelToHere, hereToCelestial); 
 
-        // https://en.wikipedia.org/wiki/Solution_of_triangles#Two_sides_and_the_included_angle_given_(spherical_SAS)
-        const hereToGeo = sas_triangle(hereToCelestial, celestialToGeo, angleHereCelGeo)
-
-        const angleCelGeoHere = asin(sin(hereToCelestial) * sin(angleHereCelGeo) / sin(hereToGeo))
-
-    
-        const poleAngle = angleCelGeoHere;
-        const poleToHere = hereToGeo;
-
-        const longOffset = celestialIsToWest ? -poleAngle : poleAngle
-        const here = {
-            lat: useNorthPole ? 90 - poleToHere : -90 + poleToHere,
-            long: mod(celestial.long + longOffset, 360)
-        }
-
+        console.log('celestial', celestial);
+        console.log('hereToCelestial', hereToCelestial);
+        console.log('celestialToMag', celestialToMag);
         console.log('useNorthPole', useNorthPole);
         console.log('celestialIsToWest', celestialIsToWest);
-        console.log('altAz', altAz);
-        console.log('celestial', celestial);
-	    console.log('altCorrection', altCorrection);
-		console.log('altitude', altitude);
-		console.log('B - angleMagHereCel', angleMagHereCel)
-    	console.log('c - dist here to celestial', hereToCelestial)
-		console.log('b - celestialToMag', celestialToMag)
-        console.log('angle at pole', poleAngle) 
-        console.log('a - here to pole', poleToHere)
-        console.log('here', here) 
-        console.log('curr1', toRegLatLong(here))
-       
+        console.log('hereAngle', hereAngle);
+        console.log('bearingCelToMag', bearingCelToMag);
+        console.log('magAngle', magAngle);
+        console.log('magToHere', magToHere);
+        console.log('celAngle', celAngle);
+        console.log('bearingCelToHere', bearingCelToHere);
+        console.log('here', here);
+
         if (Number.isNaN(here.lat) || Number.isNaN(here.lat)) {
 		    alert('Could not find a solution for you location. Perhaps you are not on earth?')
         }
 
-        return here
+        return { here, celestial };
     } else {
 		alert('Could not find a solution for you location. Perhaps you are not on earth?')
     }
 }
 
-// https://en.wikipedia.org/wiki/Solution_of_triangles#Two_sides_and_the_included_angle_given_(spherical_SAS)
-// g is angle between and b
-function sasTriangle(a, b, g) {
-    return atan(Math.sqrt((sin(a) * cos(b) - cos(a) * sin(b) * cos(g)) ** 2 + (sin(b) * sin(g)) ** 2) / (cos(a) * cos(b) + sin(a) * sin(b) * cos(g)))
+function locationFromBearingDistance(start, bearing, distance) {
+    const lat = asin(sin(start.lat) * cos(distance) + cos(start.lat) * sin(distance) * cos(bearing));
+    const long_offset = -atan2(sin(bearing) * sin(distance) * cos(start.lat), cos(distance) - sin(start.lat) * sin(lat));
+    //console.log('bearing from location', lat, long);
+    return {
+        lat,
+        long: mod(start.long + long_offset, 360)
+    }
+}
+
+/*
+function bearing(p1, p2) {
+    const y = sin(p2.long - p1.long) * cos(p2.lat);
+    const x = cos(p1.lat) * sin(p2.lat) - sin(p1.lat) * cos(p2.lat) * cos(p2.long - p1.long);
+    return mod(-atan2(y, x), 360);
+}
+*/
+
+function bearing(p1, p2) {
+    const y = sin(-p2.long + p1.long) * cos(p2.lat);
+    const x = cos(p1.lat) * sin(p2.lat) - sin(p1.lat) * cos(p2.lat) * cos(-p2.long + p1.long);
+    return mod(-atan2(y, x), 360);
 }
 
 // https://www.movable-type.co.uk/scripts/gis-faq-5.1.html
