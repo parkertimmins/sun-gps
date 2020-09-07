@@ -157,12 +157,8 @@ function toLatLong(eclipLatLong, jd) {
 
 // Find angle between pole being used and celestial point
 // azimuth only works directly is using north pole and celestial object is east of here
-function azimuthToHereAngle(azimuth, celestialIsToWest, useNorthPole) {
-    if (useNorthPole) {
-        return celestialIsToWest ? 360 - azimuth : azimuth; 
-    } else {
-        return celestialIsToWest ? azimuth - 180 : 180 - azimuth; 
-    }
+function azimuthToHereAngle(azimuth, celestialIsToWest) {
+    return celestialIsToWest ? 360 - azimuth : azimuth; 
 }
 
 
@@ -189,9 +185,8 @@ function computeLocation(altAz, jd, eclipLatLong, parallaxAngle) {
 
     const hereToCelestial = 90 - altitude - parallaxAngle
     const celestialToMag = haversineDist(MAGNETIC_NP, celestial);
-    const useNorthPole = true; 
     const celestialIsToWest = 180 < azimuth && azimuth < 360; // things get weird if directly north or south
-    const hereAngle = azimuthToHereAngle(azimuth, celestialIsToWest, useNorthPole);
+    const hereAngle = azimuthToHereAngle(azimuth, celestialIsToWest);
     const bearingCelToMag = bearing(celestial, MAGNETIC_NP); 
 
     if (celestialToMag > asin(sin(hereToCelestial) * sin(hereAngle))) {
@@ -200,13 +195,11 @@ function computeLocation(altAz, jd, eclipLatLong, parallaxAngle) {
 
         // sin(celAngle) / sin(magToHere) == sin(magAngle) / sin(hereToCelestial)
         const celAngle = asin(sin(magToHere) * sin(magAngle) / sin(hereToCelestial)) // law of sines
-        const bearingCelToHere = celestialIsToWest == useNorthPole ? bearingCelToMag + celAngle : bearingCelToMag - celAngle;
+        const bearingCelToHere = celestialIsToWest ? bearingCelToMag + celAngle : bearingCelToMag - celAngle;
         const here = locationFromBearingDistance(celestial, bearingCelToHere, hereToCelestial); 
 
-        console.log('celestial', celestial);
         console.log('hereToCelestial', hereToCelestial);
         console.log('celestialToMag', celestialToMag);
-        console.log('useNorthPole', useNorthPole);
         console.log('celestialIsToWest', celestialIsToWest);
         console.log('hereAngle', hereAngle);
         console.log('bearingCelToMag', bearingCelToMag);
@@ -214,6 +207,9 @@ function computeLocation(altAz, jd, eclipLatLong, parallaxAngle) {
         console.log('magToHere', magToHere);
         console.log('celAngle', celAngle);
         console.log('bearingCelToHere', bearingCelToHere);
+        
+        console.log('magneticNP', MAGNETIC_NP);
+        console.log('celestial', celestial);
         console.log('here', here);
 
         if (Number.isNaN(here.lat) || Number.isNaN(here.lat)) {
@@ -227,27 +223,25 @@ function computeLocation(altAz, jd, eclipLatLong, parallaxAngle) {
 }
 
 function locationFromBearingDistance(start, bearing, distance) {
+    start = toRegLatLong(start)
     const lat = asin(sin(start.lat) * cos(distance) + cos(start.lat) * sin(distance) * cos(bearing));
-    const long_offset = -atan2(sin(bearing) * sin(distance) * cos(start.lat), cos(distance) - sin(start.lat) * sin(lat));
-    //console.log('bearing from location', lat, long);
-    return {
-        lat,
-        long: mod(start.long + long_offset, 360)
-    }
+    const long_offset = atan2(sin(bearing) * sin(distance) * cos(start.lat), cos(distance) - sin(start.lat) * sin(lat));
+    const long = start.long + long_offset
+    return fromRegLatLong({ lat, long })
 }
 
-/*
+
+// https://www.movable-type.co.uk/scripts/latlong.html - Bearing
+// http://mathforum.org/library/drmath/view/55417.html
 function bearing(p1, p2) {
     const y = sin(p2.long - p1.long) * cos(p2.lat);
     const x = cos(p1.lat) * sin(p2.lat) - sin(p1.lat) * cos(p2.lat) * cos(p2.long - p1.long);
-    return mod(-atan2(y, x), 360);
-}
-*/
+    const theta = atan2(y, x)
 
-function bearing(p1, p2) {
-    const y = sin(-p2.long + p1.long) * cos(p2.lat);
-    const x = cos(p1.lat) * sin(p2.lat) - sin(p1.lat) * cos(p2.lat) * cos(-p2.long + p1.long);
-    return mod(-atan2(y, x), 360);
+    // since using long west, x is negative to normally long
+    // this means 0->180 will be from -y axis clockwise to +y axis, and 0 -> -180 will be mapped to -y axis to +y axis ccw  
+    // hence to get to standard compass degrees, need to subtract 90, then do appropiate mod
+    return mod(theta - 90, 360);
 }
 
 // https://www.movable-type.co.uk/scripts/gis-faq-5.1.html
@@ -288,3 +282,5 @@ export function toRegLong(longW) {
     longW = mod(longW, 360)
     return longW <= 180 ? -longW : 360 - longW;
 }
+
+
