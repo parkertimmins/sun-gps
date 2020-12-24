@@ -165,11 +165,10 @@ function azimuthToHereAngle(azimuth, azimuthOutsideTriangle) {
 
 /*
     Compute current location based on the observed altitude and azimuth of a 
-    celestial object, the known ecliptic latitude and longitude of the celestial
-    object, the current julian date (to compute the ra/dec of the celestial object),
+    celestial object, the known lat/long under the celestial object,
     and the known parallax angle of the object at this time
 */
-function computeLocation(altAz, celestial, parallaxAngle) {
+export function computeLocation(altAz, celestial, parallaxAngle) {
     let { altitude, azimuth } = altAz
     const altCorrection = altitudeRefractionCorrection(altitude)
     altitude += altCorrection
@@ -190,7 +189,7 @@ function computeLocation(altAz, celestial, parallaxAngle) {
         const here = locationFromBearingDistance(celestial, bearingCelToHere, hereToCelestial); 
 
         logVars({
-            azimuthOutsideTriangle, celestialToMag, hereToCelestial, hereAngle, bearingCelToMag, bearingCelToMag, 
+            hereToCelestial, celestialToMag, azimuthOutsideTriangle, hereAngle, bearingCelToMag, 
             magAngle, magToHere, celAngle, bearingCelToHere, MAGNETIC_NP, celestial, here
         })
 
