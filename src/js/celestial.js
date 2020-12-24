@@ -131,29 +131,30 @@ export function computeAltAzFromQuat(sensorQuaternion) {
 
 export function sunComputeLocation(altAz, date) {
     const jd = toJulian(date)
-    const sunLoc = sunEclipLatLong(jd)
+    const sunLoc = eclipticToEquitorial(sunEclipLatLong(jd), jd)
     // estimate based on asumption that sun at infinite distance
     const parallaxAngle = 0
-    return computeLocation(altAz, jd, sunLoc, parallaxAngle);
+    return computeLocation(altAz, sunLoc, parallaxAngle);
 }
 
 export function moonComputeLocation(altAz, date) {
     const jd = toJulian(date)
-    const moonLoc = Moon.eclipLatLong(jd)
+    const moonLoc = eclipticToEquitorial(Moon.eclipLatLong(jd), jd)
     const parallaxAngle = Moon.horizontalParallaxJd(jd) 
-    return computeLocation(altAz, jd, moonLoc, parallaxAngle);
+    return computeLocation(altAz, moonLoc, parallaxAngle);
 }
 
-function toLatLong(eclipLatLong, jd) {  
+function eclipticToEquitorial(eclipLatLong, jd) {
     const ra = rightAscension(eclipLatLong)
     const dec = declination(eclipLatLong)
-
-    // nearest point to celestial object
+    
+    logVars({ ra, dec })
     return {
         long: raToLong(jd, ra),
         lat: dec
     }
 }
+
 
 // Find angle between pole being used and celestial point
 // azimuth only works directly is using north pole and celestial object is east of here
@@ -168,22 +169,14 @@ function azimuthToHereAngle(azimuth, azimuthOutsideTriangle) {
     object, the current julian date (to compute the ra/dec of the celestial object),
     and the known parallax angle of the object at this time
 */
-function computeLocation(altAz, jd, eclipLatLong, parallaxAngle) {
-    
-	let { altitude, azimuth } = altAz
+function computeLocation(altAz, celestial, parallaxAngle) {
+    let { altitude, azimuth } = altAz
     const altCorrection = altitudeRefractionCorrection(altitude)
     altitude += altCorrection
-   
-    const ra = rightAscension(eclipLatLong)
-    const dec = declination(eclipLatLong)
-
-    // nearest point to celestial object
-    const celestial = {
-        long: raToLong(jd, ra),
-        lat: dec
-    }
-
+  
+    // side 1 length
     const hereToCelestial = 90 - altitude - parallaxAngle
+    // side 2 length
     const celestialToMag = haversineDist(MAGNETIC_NP, celestial);
     const azimuthOutsideTriangle = 180 < azimuth && azimuth < 360; // things get weird if directly north or south
     const hereAngle = azimuthOutsideTriangle ? 360 - azimuth : azimuth; 
@@ -196,27 +189,26 @@ function computeLocation(altAz, jd, eclipLatLong, parallaxAngle) {
         const bearingCelToHere = azimuthOutsideTriangle? bearingCelToMag + celAngle : bearingCelToMag - celAngle;
         const here = locationFromBearingDistance(celestial, bearingCelToHere, hereToCelestial); 
 
-        console.log('azimuthOutsideTriangle', azimuthOutsideTriangle);
-        console.log('celestialToMag', celestialToMag);
-        console.log('celestialIsToWest', celestialIsToWest);
-        console.log('hereAngle', hereAngle);
-        console.log('bearingCelToMag', bearingCelToMag);
-        console.log('magAngle', magAngle);
-        console.log('magToHere', magToHere);
-        console.log('celAngle', celAngle);
-        console.log('bearingCelToHere', bearingCelToHere);
-        
-        console.log('magneticNP', MAGNETIC_NP);
-        console.log('celestial', celestial);
-        console.log('here', here);
+        logVars({
+            azimuthOutsideTriangle, celestialToMag, hereToCelestial, hereAngle, bearingCelToMag, bearingCelToMag, 
+            magAngle, magToHere, celAngle, bearingCelToHere, MAGNETIC_NP, celestial, here
+        })
 
-        if (Number.isNaN(here.lat) || Number.isNaN(here.lat)) {
+        if (Number.isNaN(here.lat) || Number.isNaN(here.long)) {
 		    alert('Could not find a solution for you location. Perhaps you are not on earth?')
+            return {};
         }
 
         return { here, celestial };
     } else {
 		alert('Could not find a solution for you location. Perhaps you are not on earth?')
+        return {};
+    }
+}
+
+function logVars(variables) {
+    for (let varName in variables) {
+        console.log(varName, variables[varName])     
     }
 }
 

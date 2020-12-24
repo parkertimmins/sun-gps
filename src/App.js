@@ -42,6 +42,11 @@ class App extends React.Component {
     }
 
     addLatLong(reading) {
+        // failed reading
+        if (Object.keys(reading).length === 0) {
+            return;
+        }
+
 		const hereLatLong = markerLatLong(reading.here); 
         console.log("Adding position", reading.here); 
         this.setState(prevState => ({
